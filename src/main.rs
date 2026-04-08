@@ -337,23 +337,45 @@ async fn main() -> Result<()> {
                         &wake_word,
                     ).await;
 
-                    // Restart always-listening mode if needed
-                    // Aguarda 4s sem bloquear outros branches usando uma flag de tempo
+                    // Reinício assíncrono do Always Listening (NÃO BLOQUEANTE)
                     if always_listening && !recording {
-                        let always_restart_at = tokio::time::Instant::now()
-                            + tokio::time::Duration::from_secs(4);
-                        tracing::info!("🎧 Always Listening: aguardando 4s para modificação...");
-                        tokio::time::sleep_until(always_restart_at).await;
-                        tracing::info!("🎧 Reiniciando escuta (wake word: '{}')", wake_word);
-                        handle_toggle_recording(
-                            &mut recording,
-                            &lumen_state,
-                            &audio_capture,
-                            &pipeline,
-                            &mut overlay,
-                            &vad,
-                            &vad_tx,
-                        ).await;
+                        let lumen_state_c = Arc::clone(&lumen_state);
+                        let audio_capture_c = Arc::clone(&audio_capture);
+                        let pipeline_c = pipeline.clone();
+                        let overlay_tx_c = overlay.clone_sender();
+                        let vad_c = Arc::clone(&vad);
+                        let vad_tx_c = vad_tx.clone();
+                        let wake_word_c = wake_word.clone();
+
+                        tokio::spawn(async move {
+                            tracing::info!("🎧 Always Listening: aguardando 4s para reativar...");
+                            tokio::time::sleep(tokio::time::Duration::from_secs(4)).await;
+                            
+                            // Verificar se o modo ainda está ativo após o sono
+                            let config = lumen_state_c.config.read().await;
+                            if !config.transcription.always_listening {
+                                return;
+                            }
+                            drop(config);
+
+                            tracing::info!("🎧 Reiniciando escuta (wake word: '{}')", wake_word_c);
+                            
+                            // Recria o componente overlay temporário para a chamada
+                            let mut overlay_c = ui::overlay::Overlay::from_sender(overlay_tx_c);
+                            
+                            // Flag dummy mutável para satisfazer a assinatura
+                            let mut rec_flag = false;
+                            
+                            handle_toggle_recording(
+                                &mut rec_flag,
+                                &lumen_state_c,
+                                &audio_capture_c,
+                                &pipeline_c,
+                                &mut overlay_c,
+                                &vad_c,
+                                &vad_tx_c,
+                            ).await;
+                        });
                     }
                 }
             }
@@ -475,6 +497,11 @@ async fn handle_toggle_recording(
                 // Ler novos samples do buffer compartilhado
                 let new_samples = {
                     if let Ok(samples) = capture_samples.lock() {
+                        // Proteção contra pânico de índice se o buffer for reduzido/limpo externamente
+                        if samples.len() < last_len {
+                            last_len = 0;
+                        }
+
                         if samples.len() > last_len {
                             let chunk = samples[last_len..].to_vec();
                             last_len = samples.len();

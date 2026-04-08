@@ -33,17 +33,17 @@ impl Overlay {
                 let container = window
                     .child()
                     .and_then(|c| c.downcast::<gtk4::Box>().ok())
-                    .unwrap();
+                    .expect("Falha ao inicializar container do overlay (Box)");
 
                 let drawing_area: gtk4::DrawingArea = container
                     .first_child()
                     .and_then(|c| c.downcast::<gtk4::DrawingArea>().ok())
-                    .unwrap();
+                    .expect("Falha ao inicializar área de desenho do overlay");
 
                 let label: gtk4::Label = container
                     .last_child()
                     .and_then(|c| c.downcast::<gtk4::Label>().ok())
-                    .unwrap();
+                    .expect("Falha ao inicializar label de transcrição do overlay");
 
                 let receiver_clone = receiver.clone();
                 let mut anim_tick_id: Option<gtk4::TickCallbackId> = None;
@@ -148,6 +148,15 @@ impl Overlay {
         Self {
             sender,
             _handle: Some(handle),
+        }
+    }
+
+    /// Cria uma instância do controlador de overlay a partir de um sender existente.
+    /// Útil para tarefas que precisam enviar mensagens sem deter a posse da thread GUI.
+    pub fn from_sender(sender: Sender<OverlayMessage>) -> Self {
+        Self {
+            sender,
+            _handle: None,
         }
     }
 

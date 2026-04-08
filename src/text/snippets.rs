@@ -15,6 +15,12 @@ impl SnippetManager {
         Self { entries }
     }
 
+    /// Recarrega todos os snippets a partir de um novo mapa.
+    pub fn reload(&mut self, entries: HashMap<String, String>) {
+        tracing::info!("🔄 Recarregando snippets ({} entradas)", entries.len());
+        self.entries = entries;
+    }
+
     /// Verifica se o texto é um trigger de snippet e retorna o texto expandido.
     /// Retorna None se não for um snippet.
     pub fn expand(&self, text: &str) -> Option<&String> {

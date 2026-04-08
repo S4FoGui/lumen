@@ -22,6 +22,15 @@ impl CustomDictionary {
         Self { entries: normalized }
     }
 
+    /// Recarrega o dicionário a partir de novas entradas da configuração.
+    pub fn reload(&mut self, entries: HashMap<String, DictionaryEntryData>) {
+        tracing::info!("🔄 Recarregando dicionário customizado ({} entradas)", entries.len());
+        self.entries = entries
+            .into_iter()
+            .map(|(k, v)| (k.to_lowercase(), v.value))
+            .collect();
+    }
+
     /// Aplica as correções do dicionário ao texto.
     /// Substitui ocorrências case-insensitive das chaves pelos valores.
     pub fn apply(&self, text: &str) -> String {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
@@ -9,6 +9,7 @@ export function HistoryTab() {
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadHistory = useCallback(async () => {
     setLoading(true);
@@ -43,9 +44,18 @@ export function HistoryTab() {
   const clearHistory = async () => {
     if (!confirmClear) {
       setConfirmClear(true);
+      // ✅ FIX: Limpar timeout anterior se existir
+      if (confirmTimeoutRef.current) {
+        clearTimeout(confirmTimeoutRef.current);
+      }
       // Auto-cancel confirmation after 3s
-      setTimeout(() => setConfirmClear(false), 3000);
+      confirmTimeoutRef.current = setTimeout(() => setConfirmClear(false), 3000);
       return;
+    }
+    // ✅ FIX: Limpar timeout ao confirmar
+    if (confirmTimeoutRef.current) {
+      clearTimeout(confirmTimeoutRef.current);
+      confirmTimeoutRef.current = null;
     }
 
     setClearing(true);

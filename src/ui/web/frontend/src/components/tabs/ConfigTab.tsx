@@ -36,27 +36,41 @@ export function ConfigTab() {
 
   // Update locale state
   const updateConfig = (section: string, key: string, value: any) => {
-    setConfig((prev: any) => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [key]: value
+    setConfig((prev: any) => {
+      // ✅ FIX: Verificar se prev existe e prev[section] existe
+      if (!prev || typeof prev !== 'object') {
+        console.warn('Config não carregada ainda');
+        return prev;
       }
-    }));
+      return {
+        ...prev,
+        [section]: {
+          ...(prev[section] || {}),
+          [key]: value
+        }
+      };
+    });
     setSavedStatus(false);
   };
 
   const updateAiProviderConfig = (provider: string, key: string, value: any) => {
-    setConfig((prev: any) => ({
-      ...prev,
-      ai: {
-        ...prev.ai,
-        [provider]: {
-          ...prev.ai[provider],
-          [key]: value
-        }
+    setConfig((prev: any) => {
+      // ✅ FIX: Verificar se prev e prev.ai existem
+      if (!prev || !prev.ai) {
+        console.warn('Config de AI não carregada ainda');
+        return prev;
       }
-    }));
+      return {
+        ...prev,
+        ai: {
+          ...prev.ai,
+          [provider]: {
+            ...(prev.ai[provider] || {}),
+            [key]: value
+          }
+        }
+      };
+    });
     setSavedStatus(false);
   };
 

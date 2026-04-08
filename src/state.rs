@@ -88,6 +88,30 @@ impl LumenState {
             tracing::debug!("Config salvo automaticamente");
         }
     }
+
+    /// Sincroniza os componentes "vivos" com a configuração atual.
+    /// Deve ser chamado após atualizar o config via Dashboard/API para evitar inconsistências.
+    pub async fn sync_live_components(&self) {
+        let config = self.config.read().await;
+        
+        // 1. Sincronizar Dicionário
+        {
+            let mut dict = self.dictionary.write().await;
+            dict.reload(config.dictionary.entries.clone());
+        }
+
+        // 2. Sincronizar Snippets
+        {
+            let mut snippets = self.snippets.write().await;
+            snippets.reload(config.snippets.entries.clone());
+        }
+
+        // 3. O AiFormatter é o único componente que precisa de reinicialização completa
+        // se as chaves/provedores mudarem, mas como ele é Arc, mantemos o ponteira
+        // e apenas atualizamos os campos internos se necessário (nesta fase, focado em dict/snippets)
+        
+        tracing::info!("🔄 Componentes vivos sincronizados com a nova configuração");
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════

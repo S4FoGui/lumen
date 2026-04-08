@@ -35,3 +35,9 @@
 - **Status:** 🟢 VAD e Beam Search testados (acurácia superior em PT-BR).
 - **Status:** 🟢 Token Saver MCP totalmente integrado e documentado na Constituição.
 - **Status:** 🟢 Todas as fases do `task_plan.md` concluídas.
+
+### 📊 Dashboard e Estados (v1.0.4)
+- [x] Corrigir erro de Sincronização Global (Split Brain)
+- [x] Implementar `reload()` em `SnippetManager` e `CustomDictionary`
+- [x] Sincronizar live-components no endpoint `api_update_config`
+- [x] Validar thread-safety do Analytics DB

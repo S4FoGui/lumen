@@ -226,6 +226,9 @@ async fn api_update_config(
         *config = new_config.clone();
     }
 
+    // Sincronizar componentes vivos (SnippetManager, DictionaryManager, etc)
+    state.sync_live_components().await;
+
     // Salvar no disco
     if let Err(e) = new_config.save() {
         tracing::error!("Falha ao salvar config: {}", e);

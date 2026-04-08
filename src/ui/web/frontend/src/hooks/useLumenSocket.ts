@@ -133,15 +133,25 @@ export function useLumenSocket() {
     socketRef.current = ws;
   }, []);
 
+  // Ref para rastrear se o uptime veio do servidor recentemente
+  const lastServerUptimeRef = useRef<number>(0);
+  const lastUptimeUpdateRef = useRef<number>(Date.now());
+
   useEffect(() => {
     connect();
-    
-    // Atualizar o uptime a cada segundo visualmente para não depender só do WS
+
+    // Atualizar o uptime a cada segundo APENAS se não recebemos do servidor recentemente
     const uptimeInterval = setInterval(() => {
-        setStatus(prev => ({
-            ...prev,
-            uptime_seconds: prev.uptime_seconds > 0 ? prev.uptime_seconds + 1 : 0
-        }));
+        const now = Date.now();
+        const timeSinceLastServerUpdate = now - lastUptimeUpdateRef.current;
+
+        // Só incrementa localmente se não recebemos do servidor nos últimos 2 segundos
+        if (timeSinceLastServerUpdate > 2000) {
+            setStatus(prev => ({
+                ...prev,
+                uptime_seconds: prev.uptime_seconds > 0 ? prev.uptime_seconds + 1 : 0
+            }));
+        }
     }, 1000);
 
     return () => {
@@ -153,6 +163,12 @@ export function useLumenSocket() {
       clearInterval(uptimeInterval);
     };
   }, [connect]);
+
+  // Atualizar referência quando receber uptime do servidor
+  useEffect(() => {
+    lastServerUptimeRef.current = status.uptime_seconds;
+    lastUptimeUpdateRef.current = Date.now();
+  }, [status.uptime_seconds]);
 
   return {
     status,

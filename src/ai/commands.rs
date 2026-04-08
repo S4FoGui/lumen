@@ -137,9 +137,8 @@ impl CommandDetector {
         let mut found_newline = false;
         for trigger in &self.newline_triggers {
             let lower_result = result.to_lowercase();
-            if lower_result.contains(trigger.as_str()) {
+            if let Some(start) = lower_result.find(trigger.as_str()) {
                 // Substituir trigger por \n (case-insensitive)
-                let start = lower_result.find(trigger.as_str()).unwrap();
                 let end = start + trigger.len();
                 result = format!("{}\n{}", result[..start].trim(), result[end..].trim());
                 found_newline = true;
