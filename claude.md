@@ -17,7 +17,12 @@
 
 ## 4. MCP Server Management
 - **Shadcn/UI MCP:** `npx -y shadcn mcp`.
-- **Target:** Environment-specific configuration.
+- **Token Saver MCP:** Ferramentas customizadas para economia de tokens:
+    - `summarize_file`: Assinaturas e imports (economia de ~70%).
+    - `extract_relevant_code`: Busca semântica e contextual.
+    - `list_project_structure`: Árvore recursiva compacta.
+    - `diff_summary`: Resumo estatístico de mudanças.
+    - `count_tokens_estimate`: Heurística para planejamento de contexto.
 
 ## 5. File Structure Reference
 ```

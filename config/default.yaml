@@ -10,7 +10,7 @@ audio:
 
 # --- Transcrição ---
 transcription:
-  model_path: null
+  model_path: /home/gui/.local/share/lumen/models/ggml-medium.bin
   language: "pt"
   lightning_mode: false
   # ✅ FIX: Reduzido de 4000ms para 1200ms — mais responsivo

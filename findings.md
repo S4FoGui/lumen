@@ -71,3 +71,8 @@ O Lumen é uma **ferramenta avançada de ditado por voz baseada em IA** que func
 - **Root:** `/home/gui/Downloads/projetos/Projeto_guilherme/lumen`
 - **Stack:** Rust (binário único ~20MB) + React/Vite frontend
 - **Server:** Axum em localhost:8484
+
+## [2026-04-08] KDE Wayland & Performance Findings
+- **Wayland Virtual Keyboard Protocol:** O KDE Plasma 6 rejeita o protocolo `zwp_virtual_keyboard_v1` usado pelo `wtype`. O método mais confiável para injeção de texto nativa sem permissões de root é **Clipboard + Paste (wl-copy + Ctrl+V)**.
+- **XWayland & Focus:** Ferramentas baseadas em X11 (xdotool) têm dificuldade com foco em janelas nativas Wayland. Delays de pelo menos 250ms são necessários após a cópia para assegurar o foco.
+- **Whisper Medium Latency:** Modelos de IA maiores (1.5GB+) travam o loop principal do sistema se processados de forma síncrona. O uso de `tokio::spawn` para isolar a transcrição é mandatório para manter a responsividade das hotkeys.

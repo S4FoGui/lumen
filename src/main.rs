@@ -163,13 +163,13 @@ async fn main() -> Result<()> {
 
     // 6. Pipeline de transcrição (NOVO — integra VAD, Commands, Auto-Send)
     let pipeline = transcription_engine.as_ref().map(|engine| {
-        TranscriptionPipeline::new(
+        Arc::new(TranscriptionPipeline::new(
             Arc::clone(&lumen_state),
             Arc::clone(engine),
             filler_filter,
             Arc::clone(&text_injector),
             Arc::clone(&analytics_db),
-        )
+        ))
     });
 
     // 6. VAD — Voice Activity Detector (NOVO)
@@ -222,6 +222,7 @@ async fn main() -> Result<()> {
     // Event loop principal
     // ═══════════════════════════════════════════════════════════
     let mut recording = false;
+    let mut last_toggle = tokio::time::Instant::now() - tokio::time::Duration::from_secs(1);
 
     // Canal para VAD enviar sinal de fim de fala
     let (vad_tx, mut vad_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
@@ -291,6 +292,13 @@ async fn main() -> Result<()> {
             Some(event) = hotkey_rx.recv() => {
                 match event {
                     hotkeys::manager::LumenHotkey::ToggleRecording => {
+                        let now = tokio::time::Instant::now();
+                        if now.duration_since(last_toggle) < tokio::time::Duration::from_millis(800) {
+                            tracing::debug!("Hotkey debounce: ignorando toggle rápido");
+                            continue;
+                        }
+                        last_toggle = now;
+
                         if always_listening {
                             tracing::info!("🎧 Always Listening ativo: hotkey de gravação ignorada");
                         } else {
@@ -400,7 +408,7 @@ async fn handle_toggle_recording(
     recording: &mut bool,
     state: &Arc<LumenState>,
     audio_capture: &Arc<RwLock<audio::capture::AudioCapture>>,
-    pipeline: &Option<TranscriptionPipeline>,
+    pipeline: &Option<Arc<TranscriptionPipeline>>,
     overlay: &mut ui::overlay::Overlay,
     vad: &Arc<RwLock<VoiceActivityDetector>>,
     vad_tx: &tokio::sync::mpsc::UnboundedSender<()>,
@@ -512,7 +520,7 @@ async fn handle_stop_and_process(
     recording: &mut bool,
     state: &Arc<LumenState>,
     audio_capture: &Arc<RwLock<audio::capture::AudioCapture>>,
-    pipeline: &Option<TranscriptionPipeline>,
+    pipeline: &Option<Arc<TranscriptionPipeline>>,
     overlay: &mut ui::overlay::Overlay,
     always_listening: bool,
     wake_word: &str,
@@ -533,50 +541,59 @@ async fn handle_stop_and_process(
         return;
     }
 
-    // Processar via Pipeline
-    if let Some(ref pipe) = pipeline {
-        match pipe.process(samples).await {
-            Ok(record) => {
-                // Wake word gate no modo always listening
-                if always_listening {
-                    let lower = record.raw_text.to_lowercase();
-                    let wake = wake_word.to_lowercase();
-                    let has_wake = lower.starts_with(&wake)
-                        || lower.contains(&format!("{} ", wake))
-                        || lower.contains(&format!("{}:", wake));
+    // ✅ Verificar duração mínima (evita processar cliques acidentais/rápidos)
+    let duration_ms = (samples.len() as f32 / state.config.read().await.audio.sample_rate as f32) * 1000.0;
+    if duration_ms < 500.0 {
+        tracing::info!("🎤 Gravação muito curta ({:.0}ms) — descartando", duration_ms);
+        return;
+    }
 
-                    if !has_wake {
-                        tracing::info!("🎧 Always Listening: wake word não detectada, ignorando trecho");
-                    } else {
-                        tracing::info!("🎧 Always Listening: wake word detectada, comando processado");
-                        if !record.processed_text.is_empty() {
-                            overlay.show_transcription(&record.processed_text).ok();
-                            let overlay_hide = overlay.clone_sender();
-                            tokio::spawn(async move {
-                                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-                                let _ = overlay_hide.try_send(ui::overlay::OverlayMessage::HideRecording);
-                            });
+    tracing::info!("Capturadas {} amostras ({:.1}s de áudio)", samples.len(), duration_ms / 1000.0);
+
+    // Processar via Pipeline (SPAWE TASK — não bloqueia o loop de hotkeys)
+    if let Some(pipe) = pipeline {
+        let pipe = Arc::clone(pipe);
+        let state_clone = Arc::clone(state);
+        let overlay_sender = overlay.clone_sender();
+        let always = always_listening;
+        let wake = wake_word.to_string();
+
+        tokio::spawn(async move {
+            tracing::info!("🧠 Iniciando transcrição em segundo plano...");
+            match pipe.process(samples).await {
+                Ok(record) => {
+                    // Wake word gate no modo always listening
+                    if always {
+                        let lower = record.raw_text.to_lowercase();
+                        let wake_lower = wake.to_lowercase();
+                        let has_wake = lower.starts_with(&wake_lower)
+                            || lower.contains(&format!("{} ", wake_lower))
+                            || lower.contains(&format!("{}:", wake_lower));
+
+                        if !has_wake {
+                            tracing::info!("🎧 Always Listening: wake word não detectada");
+                        } else {
+                            tracing::info!("🎧 Always Listening: wake word detectada");
+                            if !record.processed_text.is_empty() {
+                                let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::UpdateTranscription(record.processed_text.clone()));
+                                tokio::time::sleep(tokio::time::Duration::from_secs(4)).await;
+                                let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::HideRecording);
+                            }
                         }
+                    } else if !record.processed_text.is_empty() {
+                        let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::UpdateTranscription(record.processed_text.clone()));
+                        tokio::time::sleep(tokio::time::Duration::from_secs(4)).await;
+                        let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::HideRecording);
                     }
-                } else if !record.processed_text.is_empty() {
-                    overlay.show_transcription(&record.processed_text).ok();
-
-                    // Auto-hide após 3 segundos
-                    let overlay_hide = overlay.clone_sender();
-                    tokio::spawn(async move {
-                        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-                        let _ = overlay_hide.try_send(ui::overlay::OverlayMessage::HideRecording);
-                    });
+                }
+                Err(e) => {
+                    tracing::warn!("Erro na transcrição em segundo plano: {}", e);
                 }
             }
-            Err(e) => {
-                tracing::warn!("Pipeline: {}", e);
-            }
-        }
+        });
     } else {
         tracing::error!("Motor de transcrição não disponível");
     }
-
 }
 
 /// Imprime o banner do Lumen

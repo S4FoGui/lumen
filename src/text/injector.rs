@@ -71,24 +71,19 @@ impl TextInjector {
             let has_wl_copy = which::which("wl-copy").is_ok();
             let has_ydotool = which::which("ydotool").is_ok();
             let has_xdotool = which::which("xdotool").is_ok();
-            let has_wtype = which::which("wtype").is_ok();
 
             tracing::info!(
-                "Wayland/KDE tools: wl-copy={}, ydotool={}, xdotool={}, wtype={}",
-                has_wl_copy, has_ydotool, has_xdotool, has_wtype
+                "Wayland/KDE tools: wl-copy={}, ydotool={}, xdotool={}",
+                has_wl_copy, has_ydotool, has_xdotool
             );
 
             // Clipboard é preferido no KDE porque funciona em apps nativos e Electron
             if has_wl_copy && (has_ydotool || has_xdotool) {
                 return InjectionMethod::ClipboardPaste;
             }
-            if has_ydotool {
-                return InjectionMethod::Ydotool;
-            }
-            if has_wtype {
-                return InjectionMethod::Wayland;
-            }
-            // Último recurso: clipboard sem paste automático
+
+            // Fallback para Clipboard mesmo se ferramentas de paste automático faltarem
+            // (Melhor que wtype que falha silenciosamente ou quebra no KDE 6)
             return InjectionMethod::ClipboardPaste;
         }
 
@@ -112,8 +107,8 @@ impl TextInjector {
             InjectionMethod::ClipboardPaste => {
                 // Copiar para clipboard e colar
                 self.copy_to_clipboard(text)?;
-                // Delay extra para o clipboard estar pronto
-                std::thread::sleep(Duration::from_millis(100));
+                // Delay extra para o clipboard estar pronto e a janela focar (KDE 6 é lento)
+                std::thread::sleep(Duration::from_millis(250));
                 self.simulate_paste()?;
             }
             _ => {
