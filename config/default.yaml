@@ -50,7 +50,7 @@ hotkeys:
 text_injection:
   # ✅ FIX: Forçar clipboard no KDE/Plasma — xdotool não funciona bem no Wayland
   method: "clipboard"
-  delay_ms: 150
+  delay_ms: 500
 
 # --- Inteligência Artificial ---
 ai:

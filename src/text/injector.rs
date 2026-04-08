@@ -100,6 +100,7 @@ impl TextInjector {
             return Ok(());
         }
 
+        tracing::info!("📝 Injetando texto ({} caracteres): \"{}\"", text.len(), text);
         // ✅ Delay antes de injetar (deixa tempo para o foco voltar à janela alvo)
         std::thread::sleep(Duration::from_millis(self.delay_ms));
 
@@ -108,7 +109,7 @@ impl TextInjector {
                 // Copiar para clipboard e colar
                 self.copy_to_clipboard(text)?;
                 // Delay extra para o clipboard estar pronto e a janela focar (KDE 6 é lento)
-                std::thread::sleep(Duration::from_millis(250));
+                std::thread::sleep(Duration::from_millis(400));
                 self.simulate_paste()?;
             }
             _ => {
@@ -122,10 +123,12 @@ impl TextInjector {
             }
         }
 
+        tracing::info!("✅ Texto injetado com sucesso");
         Ok(())
     }
 
     fn copy_to_clipboard(&self, text: &str) -> Result<()> {
+        tracing::debug!("📋 Copiando texto para clipboard...");
         // 1) wl-copy (Wayland — mais confiável no KDE)
         if let Ok(mut child) = Command::new("wl-copy")
             .stdin(std::process::Stdio::piped())
@@ -168,6 +171,7 @@ impl TextInjector {
     }
 
     fn simulate_paste(&self) -> Result<()> {
+        tracing::debug!("⌨️ Simulando paste (Ctrl+V)...");
         // ✅ No KDE, xdotool via XWayland é surpreendentemente confiável para Ctrl+V
         // Tentar xdotool primeiro
         if let Ok(status) = Command::new("xdotool")
