@@ -85,9 +85,28 @@ O **Lumen** é uma ferramenta avançada de ditado por voz baseada em IA para Lin
   "mcpServers": {
     "shadcn": { "command": "npx", "args": ["-y", "shadcn", "mcp"] },
     "convex": { "command": "npx", "args": ["-y", "convex@latest", "mcp", "start"] },
-    "brave-browser": { "command": "python3", "args": ["/home/gui/.local/share/mcp-servers/brave-browser/server.py"] }
+    "brave-browser": { "command": "python3", "args": ["/home/gui/.local/share/mcp-servers/brave-browser/server.py"] },
+    "token-saver": { "command": "node", "args": ["/home/gui/token-saver-mcp/src/index.js"] }
   }
 }
+
+### 4.7 Token Saver Tool Payloads
+```json
+{
+  "summarize_file": {
+    "input": { "file_path": "string", "max_lines": "number (default: 80)" },
+    "output": { "content": [{ "type": "text", "text": "string" }] }
+  },
+  "list_project_structure": {
+    "input": { "root_path": "string", "max_depth": "number", "show_size": "boolean" },
+    "output": { "content": [{ "type": "text", "text": "string" }] }
+  },
+  "extract_relevant_code": {
+    "input": { "file_path": "string", "symbol": "string", "context_lines": "number" },
+    "output": { "content": [{ "type": "text", "text": "string" }] }
+  }
+}
+```
 ```
 
 ## 5. Decisões de Arquitetura (Aprovadas)

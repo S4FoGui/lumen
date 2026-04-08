@@ -1,5 +1,20 @@
 # 🔍 Findings & Research
 
+## [NEW] Token Saver MCP Technical Specs
+- **Name:** token-saver
+- **Platform:** Node.js (MCP SDK)
+- **Tools:** `summarize_file`, `list_project_structure`, `extract_relevant_code`, `diff_summary`, `count_tokens_estimate`.
+- **Objective:** Reduce token usage by sending abstracts/subsets of code instead of full files.
+
+### Implementation Logic
+- **`summarize_file`**: Filters for imports, exports, and function/class signatures.
+- **`list_project_structure`**: Recursive tree view with ignored directories (node_modules, .git, dist).
+- **`extract_relevant_code`**: Context-aware extraction based on line matching and brace depth.
+- **`diff_summary`**: Aggregates added/removed lines per file from a git diff.
+- **`count_tokens_estimate`**: Heuristic estimation (~0.75 tokens/word and ~4 chars/token).
+
+---
+
 ## Identidade do Lumen (Definição Oficial do Criador)
 
 O Lumen é uma **ferramenta avançada de ditado por voz baseada em IA** que funciona como uma camada invisível sobre qualquer aplicativo do sistema. Seu fluxo é:
@@ -28,14 +43,14 @@ O Lumen é uma **ferramenta avançada de ditado por voz baseada em IA** que func
 | Formatação IA (Ollama/OpenAI/Gemini) | ✅ Implementado | — |
 | Multi-provider IA | ✅ Implementado | — |
 | **Auto-Send (Enter)** | ❌ NÃO existe | 🔴 Alta |
-| **Detecção de fim de fala (VAD)** | ❌ NÃO existe | 🔴 Alta |
+| **Detecção de fim de fala (VAD)** | ⚠️ v1.0.2 Fix Applied | 🔴 Alta |
 | **Comandos de voz ("torne profissional")** | ❌ NÃO existe | 🔴 Alta |
 | **Agent Mode** | ❌ NÃO existe | 🟡 Média |
 | **Suporte 100+ idiomas** | ⚠️ Parcial (1 idioma por config) | 🟡 Média |
 | **Freemium (2000 palavras/semana)** | ❌ NÃO existe | 🟡 Futura |
-| Histórico de transcrições | ❌ NÃO existe | 🟡 Média |
-| WebSocket tempo real | ❌ NÃO existe | 🟡 Média |
-| State Bus centralizado | ❌ NÃO existe | 🔴 Alta |
+| Histórico de transcrições | ✅ v1.0.2 Fix Applied | 🟡 Média |
+| WebSocket tempo real | ✅ Implementado | 🟡 Média |
+| State Bus centralizado | ✅ Implementado | 🔴 Alta |
 
 ## Decisões Aprovadas pelo Usuário
 - **WebSocket** para streaming de eventos (não SSE)

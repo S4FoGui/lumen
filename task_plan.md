@@ -23,7 +23,16 @@
 - [x] Verificar conexão `/mcp`
 - [x] Inicializar componentes UI via shadcn
 - [x] Integrar MCP Server `brave-search` (v1.0)
-- [/] Atualizar MCP Server `brave-browser` (v2.0 - CDP Support) [Aguardando Blueprint]
-    - [ ] Link: Instalar `websocket-client` e verificar porta 9222
-    - [ ] Architect: Executar script v2.0
-    - [ ] Stylize: Validar ferramentas CDP (screenshots, read_page)
+- [x] Atualizar MCP Server `brave-browser` (v2.0 - CDP Support)
+
+## Fase 7: Token Saver MCP Integration [Aguardando Blueprint]
+- [ ] Blueprint: Definir schema e responder Discovery
+- [ ] Link: Criar pasta e instalar dependências
+- [ ] Architect: Implementar `src/index.js` e `package.json`
+- [ ] Stylize: Validar ferramentas no `/mcp`
+## Fase 8: v1.0.2 KDE Fixes (KDE/Wayland Stability)
+- [/] Blueprint: Mapear arquivos afetados (VAD, Engine, Injector, HistoryTab)
+- [ ] Link: Executar `fix_kde.sh` e validar dependências
+- [ ] Architect: Aplicar patches Rust e Config
+- [ ] Stylize: Atualizar HistoryTab.tsx (React)
+- [ ] Trigger: Recompilar Frontend e Backend
