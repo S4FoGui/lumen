@@ -1,0 +1,37 @@
+# Rust
+/target
+Cargo.lock
+
+# AI Models (Large files)
+/models/*.bin
+/models/*.onnx
+/models/*.pt
+
+# Temporary & Logs
+/.tmp
+/logs
+*.log
+
+# Databases & Persistency
+*.db
+*.db-journal
+*.sqlite
+/database/
+
+# Local Config & Secrets
+.env
+.env.*
+.claude/settings.local.json
+/config/local_config.yaml
+
+# Node.js (Frontend)
+node_modules/
+dist/
+.eslintcache
+
+# Tools & Local
+.gemini/
+.cursor/
+.vscode/
+.idea/
+.DS_Store

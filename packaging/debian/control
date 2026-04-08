@@ -1,0 +1,15 @@
+Source: glaido
+Section: utils
+Priority: optional
+Maintainer: Guilherme
+Build-Depends: debhelper (>= 12), cargo, cmake, libgtk-4-dev, libasound2-dev
+Standards-Version: 4.5.0
+
+Package: glaido
+Architecture: amd64
+Depends: libgtk-4-1, libasound2, libnotify-bin, xdotool
+Recommends: wtype, xclip, wl-clipboard
+Description: Ecossistema de Produtividade por Voz para Linux
+ Glaido transforma sua voz em texto com transcrição Whisper local,
+ limpeza automática de fillers, formatação inteligente via IA,
+ e injeção direta em qualquer aplicativo Linux.

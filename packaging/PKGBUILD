@@ -1,0 +1,52 @@
+# Maintainer: Guilherme
+pkgname=glaido
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Ecossistema de Produtividade por Voz para Linux"
+arch=('x86_64')
+url="https://github.com/guilherme/glaido"
+license=('MIT')
+depends=('gtk4' 'alsa-lib' 'libnotify' 'xdotool')
+optdepends=(
+    'wtype: Injeção de texto no Wayland'
+    'xclip: Fallback de clipboard no X11'
+    'wl-clipboard: Fallback de clipboard no Wayland'
+)
+makedepends=('rust' 'cargo' 'cmake')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    cargo build --release --locked
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+
+    # Binário
+    install -Dm755 "target/release/glaido" "$pkgdir/usr/bin/glaido"
+
+    # Configuração padrão
+    install -Dm644 "config/default.yaml" "$pkgdir/usr/share/glaido/default.yaml"
+
+    # Arquivos estáticos (dashboard)
+    install -Dm644 "src/ui/web/static/index.html" "$pkgdir/usr/share/glaido/static/index.html"
+    install -Dm644 "src/ui/web/static/css/style.css" "$pkgdir/usr/share/glaido/static/css/style.css"
+    install -Dm644 "src/ui/web/static/js/app.js" "$pkgdir/usr/share/glaido/static/js/app.js"
+
+    # Desktop entry
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/glaido.desktop" << EOF
+[Desktop Entry]
+Name=Glaido
+Comment=Voice Productivity Ecosystem for Linux
+Exec=/usr/bin/glaido
+Icon=audio-input-microphone
+Terminal=false
+Type=Application
+Categories=Utility;Accessibility;
+EOF
+
+    # Licença
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

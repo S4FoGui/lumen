@@ -1,0 +1,77 @@
+[package]
+name = "lumen"
+version = "1.0.0"
+edition = "2021"
+authors = ["Guilherme"]
+description = "Lumen - Ecossistema de Produtividade por Voz para Linux"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Transcrição (Whisper)
+whisper-rs = "0.16"
+
+# Captura de áudio
+cpal = "0.17"
+
+# Web server + API
+axum = { version = "0.8", features = ["ws"] }
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+
+# HTTP client (API LLM)
+reqwest = { version = "0.12", features = ["json"] }
+async-channel = "2.3"
+
+# Serialização
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# Regex (filler filter)
+regex = "1"
+
+# Hotkeys globais
+global-hotkey = "0.7"
+
+# System tray
+tray-item = { version = "0.10", features = ["ksni"] }
+
+# GTK4 overlay
+gtk4 = "0.11"
+gtk4-layer-shell = { version = "0.8", optional = true }
+
+# Diretórios XDG
+dirs = "5"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "1"
+rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
+arboard = "3.6.1"
+zbus = "4"
+which = "6"
+
+[build-dependencies]
+cmake = "0.1"
+
+[features]
+default = []
+wayland-overlay = ["gtk4-layer-shell"]
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1

@@ -1,0 +1,71 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Página-1" id="IY-u-9WmzElRb41epEAH">
+    <mxGraphModel dx="905" dy="1715" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-1" parent="1" style="whiteSpace=wrap;html=1;aspect=fixed;" value="etapa 1" vertex="1">
+          <mxGeometry height="80" width="80" x="210" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-8" edge="1" parent="1" style="curved=1;endArrow=classic;html=1;rounded=0;" target="YPfUTR-p0ae31mU1ewrg-9" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="290" y="140" />
+              <mxPoint x="240" y="90" />
+            </Array>
+            <mxPoint x="240" y="140" as="sourcePoint" />
+            <mxPoint x="290" y="90" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-9" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="arrumar bugs" vertex="1">
+          <mxGeometry height="130" width="130" x="180" y="-60" as="geometry" />
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-12" edge="1" parent="1" style="curved=1;endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="180" y="-10" />
+              <mxPoint x="130" y="-60" />
+            </Array>
+            <mxPoint x="180" y="-10" as="sourcePoint" />
+            <mxPoint x="100" y="-100" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-15" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="240" y="-60" as="sourcePoint" />
+            <mxPoint x="240" y="-90" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-17" edge="1" parent="1" style="curved=1;endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="350" y="-20" />
+              <mxPoint x="340" y="-30" />
+              <mxPoint x="340" y="-60" />
+            </Array>
+            <mxPoint x="310" y="-10" as="sourcePoint" />
+            <mxPoint x="390" y="-80" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-20" parent="1" style="text;whiteSpace=wrap;html=1;" value="&lt;span style=&quot;color: rgb(255, 255, 255); font-family: Helvetica; font-size: 12px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; background-color: rgb(27, 29, 30); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; display: inline !important; float: none;&quot;&gt;No parameters a&amp;nbsp; função de&amp;nbsp; deixar sempre ligado a gravação de audio tá bugado não tá dando para ativar&amp;nbsp;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="50" width="130" x="30" y="-200" as="geometry" />
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-21" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=#2D7600;fillColor=#60a917;align=center;verticalAlign=middle;rounded=0;fontColor=#ffffff;" value="lógica do audio transcrito no front e backend: quando clico enter 2x ele aparece aquela imagem que tá&amp;nbsp; escutando e falo&amp;nbsp; é&amp;nbsp; para&amp;nbsp; mostrar um&amp;nbsp; o audio&amp;nbsp; meu&amp;nbsp; em onda&amp;nbsp; como se tivesse&amp;nbsp; me ouvindo e só sumir quando&amp;nbsp; enviar a mensagem para o canal de texto selecionado. no modo que&amp;nbsp; &amp;nbsp;a escuta do audio tá sempre ativa&amp;nbsp; eu chamei a lumen e ela ativou o que eu falar ela passa para a ia e milesegundos e enviado para para o&amp;nbsp; canal de&amp;nbsp; texto selecionado e&amp;nbsp; ela espera 4s&amp;nbsp; &amp;nbsp;para adicionar algo ou modificar algo ai seria por comando" vertex="1">
+          <mxGeometry height="230" width="220" x="150" y="-320" as="geometry" />
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-22" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=#001DBC;fillColor=#0050ef;align=center;verticalAlign=middle;rounded=0;fontColor=#ffffff;" value="A melhoria do texto deve está sempre ativada mesmo sem uma api selecionada e&amp;nbsp; caso o usuario for usar a primeira vez o programa deve&amp;nbsp; aparecer uma notficação de aviso que&amp;nbsp; a&amp;nbsp; apikey não foi selecionada" vertex="1">
+          <mxGeometry height="200" width="160" x="390" y="-230" as="geometry" />
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-23" edge="1" parent="1" source="YPfUTR-p0ae31mU1ewrg-9" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="330" y="50" as="sourcePoint" />
+            <mxPoint x="420" y="30" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="YPfUTR-p0ae31mU1ewrg-24" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=#6F0000;fillColor=#a20025;align=center;verticalAlign=middle;rounded=0;fontColor=#ffffff;" value="além do envio de texto que não funciona porque o texto não é enviado para o canal de texto selecionado a ia deve ter poder de apagar o texto lá e até enviar clicando enter e melhorar e modificar o texto" vertex="1">
+          <mxGeometry height="90" width="260" x="420" y="-10" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

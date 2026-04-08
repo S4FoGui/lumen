@@ -1,0 +1,15 @@
+#!/bin/bash
+# Criar diretórios de configuração do usuário após instalar o .deb
+mkdir -p "$HOME/.config/glaido"
+mkdir -p "$HOME/.local/share/glaido/models"
+
+if [ ! -f "$HOME/.config/glaido/config.yaml" ]; then
+    cp /usr/share/glaido/default.yaml "$HOME/.config/glaido/config.yaml"
+fi
+
+echo ""
+echo "✅ Glaido instalado! Execute 'glaido' para iniciar."
+echo ""
+echo "Para baixar o modelo Whisper:"
+echo "  curl -L -o ~/.local/share/glaido/models/ggml-base.bin \\"
+echo "    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"

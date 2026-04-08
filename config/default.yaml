@@ -1,0 +1,149 @@
+# ============================================================
+# Lumen — Configuração Padrão
+# ============================================================
+# Copie para ~/.config/lumen/config.yaml para personalizar
+
+# --- Áudio ---
+audio:
+  # Dispositivo de entrada (null = padrão do sistema)
+  device: null
+  # Taxa de amostragem (16000 é requerido pelo Whisper)
+  sample_rate: 16000
+  # Canais (1 = mono, requerido pelo Whisper)
+  channels: 1
+
+# --- Transcrição ---
+transcription:
+  # Caminho do modelo Whisper (null = ~/.local/share/lumen/models/ggml-base.bin)
+  model_path: null
+  # Idioma principal (código ISO 639-1)
+  language: "pt"
+  # Modo lightning: transcrição bruta sem pós-processamento
+  lightning_mode: false
+  # Pressionar Enter automaticamente ao terminar de falar
+  auto_send: false
+  # Tempo de silêncio (ms) para considerar fim de fala (VAD)
+  silence_threshold_ms: 4000
+  # Detectar comandos de voz ("envie", "torne profissional", etc.)
+  voice_commands_enabled: true
+  # Modo sempre escutando (sem precisar hotkey)
+  always_listening: false
+  # Palavra de ativação para processar quando always_listening=true
+  wake_word: "lumen"
+  # Palavras de preenchimento (fillers) para remover
+  filler_words:
+    - "humm"
+    - "ééé"
+    - "ãhh"
+    - "uhh"
+    - "hmm"
+    - "uhm"
+    - "eh"
+    - "ah"
+    - "tipo assim"
+    - "né"
+    - "então"
+    - "bom"
+    - "um"
+    - "uh"
+    - "you know"
+    - "like"
+    - "actually"
+    - "basically"
+    - "literally"
+
+# --- Atalhos ---
+hotkeys:
+  # Atalho para iniciar/parar gravação (double-tap = pressionar 2x rapidamente)
+  toggle_recording: "enter"
+  # Atalho para modo lightning
+  lightning_mode: "ctrl+shift+l"
+  # Atalho para abrir dashboard
+  open_dashboard: "ctrl+shift+d"
+
+# --- Injeção de Texto ---
+text_injection:
+  # Método: "auto" (detecta X11/Wayland), "x11", "wayland", "clipboard"
+  method: "auto"
+  # Delay em ms antes de injetar texto (para dar tempo do foco voltar)
+  delay_ms: 100
+
+# --- Inteligência Artificial ---
+ai:
+  # Provider: "ollama", "openai", "gemini", "disabled"
+  provider: "disabled"
+  # Configuração Ollama (local)
+  ollama:
+    url: "http://localhost:11434"
+    api_key: ""
+    model: "llama3.2"
+  # Configuração do OmniRoute (Multi-Model Gateway)
+  omniroute:
+    url: "http://localhost:20128/v1"
+    api_key: ""
+    model: "cc/claude-3-5-sonnet"
+  # Configuração OpenAI
+  openai:
+    api_key: ""
+    model: "gpt-4o-mini"
+  # Configuração Gemini
+  gemini:
+    api_key: ""
+    model: "gemini-2.0-flash"
+  # Instrução padrão para formatação IA (Auto-Improve)
+  default_instruction: "You are an advanced voice dictation pre-processor. The input is raw speech-to-text. Your goal is to completely remove language fillers (e.g., um, ah, you know, tipo, né, então), clean up accidental repetitions, and fix stutters. Apply perfect grammar and punctuation while preserving 100% of the original meaning and natural tone. CRITICAL RULE: You MUST output the response in the EXACT same language as the input (e.g., if the user speaks in English, output in English; if Portuguese, output in Portuguese). Do NOT translate the text."
+
+# --- Snippets ---
+snippets:
+  # Formato: trigger → texto expandido
+  entries:
+    "/ola": "Olá! Tudo bem? Como posso ajudar?"
+    "/email": "Atenciosamente,\nGuilherme"
+    "/obg": "Muito obrigado pela atenção!"
+
+# --- Dicionário Customizado ---
+dictionary:
+  # Formato: palavra_errada → correção
+  entries:
+    "react":
+      value: "React"
+      context: "Web Development"
+      icon_type: "brand"
+    "javascript":
+      value: "JavaScript"
+      context: "Web Development"
+      icon_type: "brand"
+    "typescript":
+      value: "TypeScript"
+      context: "Web Development"
+      icon_type: "brand"
+    "python":
+      value: "Python"
+      context: "Software Development"
+      icon_type: "code"
+    "linux":
+      value: "Linux"
+      context: "Operating Systems"
+      icon_type: "os"
+    "github":
+      value: "GitHub"
+      context: "Version Control"
+      icon_type: "git"
+
+# --- Interface ---
+ui:
+  # Porta do web dashboard
+  dashboard_port: 8484
+  # Abrir dashboard no navegador ao iniciar
+  open_on_start: false
+  # Mostrar overlay de gravação
+  show_overlay: true
+  # Mostrar no system tray
+  show_tray: true
+
+# --- Logging ---
+logging:
+  # Nível: "trace", "debug", "info", "warn", "error"
+  level: "info"
+  # Arquivo de log (null = apenas stdout)
+  file: null
