@@ -41,3 +41,18 @@
 - [x] Implementar `reload()` em `SnippetManager` e `CustomDictionary`
 - [x] Sincronizar live-components no endpoint `api_update_config`
 - [x] Validar thread-safety do Analytics DB
+
+### 🔧 Estabilização e Groq (v1.0.5)
+- [x] Implementar diagnósticos detalhados para falhas da API Groq
+- [x] Limpeza técnica: redução de warnings (16 para 7)
+- [x] Corrigir bugs de sintaxe em `main.rs` e `overlay.rs`
+
+### 🎙️ Ondas Vivas (v1.0.6)
+- [x] Implementar `SetVolume(f32)` no pipeline de mensagens do Overlay
+- [x] Renderização reativa de áudio: barras de volume pulsam com a fala
+- [x] Sincronização de RMS em tempo real via WebSocket para o Dashboard
+
+### ⌨️ Injeção Estabilizada (v1.0.6 - KDE Wayland Fix)
+- [x] Refinar `tools/injector.py` com delays de segurança para KDE 6
+- [x] Aumentar sincronização de clipboard para 600ms em `src/text/injector.rs`
+- [/] Limpeza de emergência do `/tmp` (Resolvendo conflito de escrita)

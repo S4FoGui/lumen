@@ -186,7 +186,7 @@ fn find_keyboard_devices() -> Vec<String> {
         let mut is_keyboard = false;
         let mut event_num: Option<u32> = None;
 
-        let mut flush = |is_kbd: bool, num: &mut Option<u32>, devs: &mut Vec<String>| {
+        let flush = |is_kbd: bool, num: &mut Option<u32>, devs: &mut Vec<String>| {
             if is_kbd {
                 if let Some(n) = num.take() {
                     let path = format!("/dev/input/event{}", n);

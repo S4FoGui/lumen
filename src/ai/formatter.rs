@@ -203,11 +203,6 @@ impl AiFormatter {
         self.provider != AiProvider::Disabled
     }
 
-    /// Retorna o provider atual
-    pub fn provider(&self) -> &AiProvider {
-        &self.provider
-    }
-
     // --- Provider implementations ---
 
     async fn call_groq(&self, _prompt: &str, instruction: &str) -> Result<String> {
@@ -237,14 +232,17 @@ impl AiFormatter {
 
         let text = response.text().await.context("Falha ao ler resposta Groq")?;
         tracing::debug!(response = %text, "Resposta bruta do Groq");
+        
         let body: OpenAiResponse = serde_json::from_str(&text)
-            .context("Falha ao parsear resposta Groq")?;
+            .map_err(|e| {
+                tracing::error!("Erro de parsing no Groq. Resposta recebida: {}", text);
+                anyhow::anyhow!("Falha ao parsear resposta Groq: {}. Corpo: {}", e, text)
+            })?;
 
         body.choices
             .first()
             .map(|c| c.message.content.trim().to_string())
             .context("Resposta Groq vazia")
-
     }
 
     async fn call_ollama(&self, prompt: &str) -> Result<String> {

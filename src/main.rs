@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
                         println!("  (nenhum dispositivo encontrado)");
                     } else {
                         for (i, d) in devices.iter().enumerate() {
-                            println!("  [{}] {} ({})", i, d.1, d.0);
+                            println!("  [{}] {}", i, d.1);
                         }
                     }
                 }
@@ -481,8 +481,10 @@ async fn handle_toggle_recording(
         let capture_samples = capture.samples_ref();
         let vad_tx_clone = vad_tx.clone();
         let state_clone = Arc::clone(state);
+        let overlay_sender = overlay.clone_sender();
 
         tokio::spawn(async move {
+            let overlay_sender = overlay_sender.clone(); // Clone do Sender<OverlayMessage>
             let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(100));
             let mut last_len = 0usize;
 
@@ -521,9 +523,11 @@ async fn handle_toggle_recording(
                     match vad_state {
                         VadState::Speaking { rms } => {
                             state_clone.emit(LumenEvent::AudioLevel { rms });
+                            let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::SetVolume(rms));
                         }
                         VadState::Silence { rms } => {
                             state_clone.emit(LumenEvent::AudioLevel { rms });
+                            let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::SetVolume(rms));
                         }
                         VadState::SpeechEnded => {
                             tracing::debug!("VAD: SpeechEnded signal");
@@ -580,7 +584,6 @@ async fn handle_stop_and_process(
     // Processar via Pipeline (SPAWE TASK — não bloqueia o loop de hotkeys)
     if let Some(pipe) = pipeline {
         let pipe = Arc::clone(pipe);
-        let state_clone = Arc::clone(state);
         let overlay_sender = overlay.clone_sender();
         let always = always_listening;
         let wake = wake_word.to_string();

@@ -108,8 +108,8 @@ impl TextInjector {
             InjectionMethod::ClipboardPaste => {
                 // Copiar para clipboard e colar
                 self.copy_to_clipboard(text)?;
-                // Delay extra para o clipboard estar pronto e a janela focar (KDE 6 é lento)
-                std::thread::sleep(Duration::from_millis(400));
+                // Delay extra para o clipboard estar pronto e a janela focar (KDE 6 é lento e rigoroso)
+                std::thread::sleep(Duration::from_millis(600));
                 self.simulate_paste()?;
             }
             _ => {

@@ -78,24 +78,24 @@ def main():
         os.write(fd, dev.pack())
         fcntl.ioctl(fd, UI_DEV_CREATE)
 
-        # Aguardar o kernel registrar o dispositivo (muito importante!)
-        time.sleep(0.5)
+        # Aguardar o kernel registrar o dispositivo e o compositor (KDE 6) reconhecer (muito importante!)
+        time.sleep(0.8)
 
         if cmd == "paste":
             # Ctrl DOWN
             send_event(fd, EV_KEY, KEY_LEFTCTRL, 1)
             send_event(fd, EV_SYN, SYN_REPORT, 0)
-            time.sleep(0.05)
+            time.sleep(0.1) # Aumentado para estabilidade
             
             # V DOWN
             send_event(fd, EV_KEY, KEY_V, 1)
             send_event(fd, EV_SYN, SYN_REPORT, 0)
-            time.sleep(0.05)
+            time.sleep(0.1)
 
             # V UP
             send_event(fd, EV_KEY, KEY_V, 0)
             send_event(fd, EV_SYN, SYN_REPORT, 0)
-            time.sleep(0.05)
+            time.sleep(0.1)
 
             # Ctrl UP
             send_event(fd, EV_KEY, KEY_LEFTCTRL, 0)
@@ -104,12 +104,12 @@ def main():
         elif cmd == "enter":
             send_event(fd, EV_KEY, KEY_ENTER, 1)
             send_event(fd, EV_SYN, SYN_REPORT, 0)
-            time.sleep(0.05)
+            time.sleep(0.1)
             send_event(fd, EV_KEY, KEY_ENTER, 0)
             send_event(fd, EV_SYN, SYN_REPORT, 0)
 
-        # Aguardar os eventos serem processados antes de destruir
-        time.sleep(0.2)
+        # Aguardar os eventos serem processados antes de destruir o dispositivo virtual
+        time.sleep(0.3)
         fcntl.ioctl(fd, UI_DEV_DESTROY)
         os.close(fd)
         

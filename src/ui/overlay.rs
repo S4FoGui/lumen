@@ -8,6 +8,7 @@ pub enum OverlayMessage {
     ShowRecording,
     HideRecording,
     UpdateTranscription(String),
+    SetVolume(f32),
     Shutdown,
 }
 
@@ -49,12 +50,19 @@ impl Overlay {
                 let mut anim_tick_id: Option<gtk4::TickCallbackId> = None;
 
                 let phase = Arc::new(std::sync::atomic::AtomicU64::new(0));
+                let volume = Arc::new(std::sync::atomic::AtomicU32::new(0)); // f32 como u32 bits
 
                 // Registrar draw func antes do async move
                 let phase_draw = Arc::clone(&phase);
+                let volume_draw = Arc::clone(&volume);
                 let drawing_area_draw = drawing_area.clone();
+                
                 drawing_area_draw.set_draw_func(move |_da, cr, width, height| {
                     let t = f64::from_bits(phase_draw.load(std::sync::atomic::Ordering::Relaxed));
+                    let vol = f32::from_bits(volume_draw.load(std::sync::atomic::Ordering::Relaxed));
+
+                    // Normalizar volume (RMS costuma ser baixo, ex: 0.01-0.2)
+                    let vol_boost = (vol * 15.0).clamp(0.0, 1.5) as f64;
 
                     let bar_count = 12i32;
                     let bar_w = 3.0f64;
@@ -68,7 +76,9 @@ impl Overlay {
                         let norm = i as f64 / bar_count as f64;
                         let bell = (std::f64::consts::PI * norm).sin();
                         let wave = (t * 6.0 + norm * std::f64::consts::TAU * 1.5).sin() * 0.5 + 0.5;
-                        let h = (bell * wave * max_h).max(3.0);
+                        
+                        // Altura reativa: base mínima de 3px + pulso do volume
+                        let h = (bell * (0.2 + vol_boost) * wave * max_h).max(3.0);
 
                         let x = start_x + i as f64 * (bar_w + gap);
                         let y = center_y - h / 2.0;
@@ -130,6 +140,10 @@ impl Overlay {
                                     });
                                     anim_tick_id = Some(tick_id);
                                 }
+                            }
+                            OverlayMessage::SetVolume(v) => {
+                                volume.store(v.to_bits(), std::sync::atomic::Ordering::Relaxed);
+                                drawing_area.queue_draw();
                             }
                             OverlayMessage::Shutdown => {
                                 window.close();

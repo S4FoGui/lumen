@@ -176,12 +176,6 @@ async fn serve_index_from_disk(static_dir: String) -> impl IntoResponse {
     }
 }
 
-async fn serve_index() -> impl IntoResponse {
-    // Mantido apenas para compatibilidade; não utilizado no roteamento atual
-    let html = include_str!("frontend/dist/index.html");
-    Html(html)
-}
-
 async fn api_health() -> Json<HealthResponse> {
     Json(HealthResponse {
         status: "ok".into(),

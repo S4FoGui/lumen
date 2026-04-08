@@ -1,4 +1,4 @@
-use crate::error::{LumenError, LumenResult as Result};
+use crate::error::LumenResult as Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

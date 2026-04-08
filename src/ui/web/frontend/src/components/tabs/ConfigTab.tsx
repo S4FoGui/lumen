@@ -357,25 +357,50 @@ export function ConfigTab() {
                 </div>
               )}
 
-              {aiProvider === 'groq' && (
+              {aiProvider === 'gemini' && (
                 <div className="animate-in fade-in slide-in-from-top-2 space-y-4 p-4 rounded-md border border-border bg-secondary/10">
                   <div className="space-y-2">
-                    <Label>Groq API Key</Label>
-                    <Input 
-                      type="password" 
-                      value={config.ai.groq?.api_key || ''} 
-                      onChange={(e) => updateAiProviderConfig('groq', 'api_key', e.target.value)}
-                      placeholder="gsk_..." 
-                      className="bg-background/50 border-border" 
+                    <Label>Google API Key</Label>
+                    <Input
+                      type="password"
+                      value={config.ai.gemini?.api_key || ''}
+                      onChange={(e) => updateAiProviderConfig('gemini', 'api_key', e.target.value)}
+                      placeholder="AIza..."
+                      className="bg-background/50 border-border"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Modelo</Label>
-                    <Input 
-                      value={config.ai.groq?.model || ''} 
+                    <Input
+                      value={config.ai.gemini?.model || ''}
+                      onChange={(e) => updateAiProviderConfig('gemini', 'model', e.target.value)}
+                      placeholder="gemini-1.5-flash"
+                      className="bg-background/50 border-border"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">Obtenha sua API key em makersuite.google.com/app/apikey</p>
+                </div>
+              )}
+
+              {aiProvider === 'groq' && (
+                <div className="animate-in fade-in slide-in-from-top-2 space-y-4 p-4 rounded-md border border-border bg-secondary/10">
+                  <div className="space-y-2">
+                    <Label>Groq API Key</Label>
+                    <Input
+                      type="password"
+                      value={config.ai.groq?.api_key || ''}
+                      onChange={(e) => updateAiProviderConfig('groq', 'api_key', e.target.value)}
+                      placeholder="gsk_..."
+                      className="bg-background/50 border-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Modelo</Label>
+                    <Input
+                      value={config.ai.groq?.model || ''}
                       onChange={(e) => updateAiProviderConfig('groq', 'model', e.target.value)}
-                      placeholder="llama-3.3-70b-versatile" 
-                      className="bg-background/50 border-border" 
+                      placeholder="llama-3.3-70b-versatile"
+                      className="bg-background/50 border-border"
                     />
                   </div>
                 </div>

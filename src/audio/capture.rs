@@ -43,6 +43,7 @@ impl AudioCapture {
             Some(name) => {
                 let devices = host.input_devices()
                     .context("Falha ao listar dispositivos de entrada")?;
+                #[allow(deprecated)]
                 devices
                     .into_iter()
                     .find(|d| d.name().map(|n| n == *name).unwrap_or(false))
@@ -53,6 +54,7 @@ impl AudioCapture {
                 .context("Nenhum dispositivo de entrada padrão encontrado")?,
         };
 
+        #[allow(deprecated)]
         let device_name = device.name().unwrap_or_else(|_| "desconhecido".into());
         tracing::info!("Usando dispositivo de áudio: {}", device_name);
 
@@ -159,10 +161,7 @@ impl AudioCapture {
         Ok(samples)
     }
 
-    /// Retorna se está gravando atualmente
-    pub fn is_recording(&self) -> bool {
-        self.stream.is_some()
-    }
+// is_recording removido (unused)
 
     /// Lista todos os dispositivos de entrada disponíveis com nomes bonitos
     pub fn list_devices() -> Result<Vec<(String, String)>> {
@@ -197,6 +196,7 @@ impl AudioCapture {
         let mut categorized_alsa: std::collections::HashMap<String, (String, String, i32)> = std::collections::HashMap::new();
         let mut final_list: Vec<(String, String)> = Vec::new();
 
+        #[allow(deprecated)]
         for d in devices.filter_map(|d| d.name().ok()) {
             let id = d.clone();
             
