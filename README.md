@@ -50,10 +50,13 @@ chmod +x scripts/install.sh
 ```
 
 ### Download do modelo Whisper
+O Lumen requer um modelo Whisper em formato GGML. Recomendamos o modelo `small` para um bom equilíbrio entre velocidade e precisão.
+
 ```bash
 mkdir -p ~/.local/share/lumen/models
-curl -L -o ~/.local/share/lumen/models/ggml-base.bin \
-  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+# Modelo Small (Recomendado)
+curl -L -o ~/.local/share/lumen/models/ggml-small.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
 ```
 
 ## 🚀 Uso
