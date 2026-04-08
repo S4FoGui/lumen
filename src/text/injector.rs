@@ -171,41 +171,55 @@ impl TextInjector {
     }
 
     fn simulate_paste(&self) -> Result<()> {
+        let is_wayland = std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland";
+        
         tracing::debug!("⌨️ Simulando paste (Ctrl+V)...");
-        // ✅ No KDE, xdotool via XWayland é surpreendentemente confiável para Ctrl+V
-        // Tentar xdotool primeiro
-        if let Ok(status) = Command::new("xdotool")
-            .args(["key", "--clearmodifiers", "ctrl+v"])
-            .status()
-        {
-            if status.success() {
-                tracing::debug!("Paste via xdotool Ctrl+V");
-                return Ok(());
+
+        // 1. ydotool (Melhor para Wayland nativo)
+        if which::which("ydotool").is_ok() {
+            // Tenta usar o socket do ydotool se o daemon estiver rodando
+            let socket = std::env::var("YDOTOOL_SOCKET").unwrap_or_else(|_| "/tmp/ydotoolsock".to_string());
+            if let Ok(mut child) = Command::new("ydotool")
+                .env("YDOTOOL_SOCKET", &socket)
+                .args(["key", "29:1", "47:1", "47:0", "29:0"])
+                .spawn()
+            {
+                if child.wait().map(|s| s.success()).unwrap_or(false) {
+                    tracing::debug!("Paste via ydotool");
+                    return Ok(());
+                }
             }
         }
 
-        // wtype (Wayland nativo)
-        if let Ok(mut child) = Command::new("wtype")
-            .args(["-M", "ctrl", "-k", "v", "-m", "ctrl"])
-            .spawn()
-        {
-            let _ = child.wait();
-            tracing::debug!("Paste via wtype");
-            return Ok(());
+        // 2. wtype (Wayland nativo — foca no protocolo do compositor)
+        if is_wayland && which::which("wtype").is_ok() {
+            if let Ok(mut child) = Command::new("wtype")
+                .args(["-M", "ctrl", "-k", "v", "-m", "ctrl"])
+                .spawn()
+            {
+                if child.wait().map(|s| s.success()).unwrap_or(false) {
+                    tracing::debug!("Paste via wtype");
+                    return Ok(());
+                }
+            }
         }
 
-        // ydotool
-        if let Ok(mut child) = Command::new("ydotool")
-            .args(["key", "29:1", "47:1", "47:0", "29:0"])
-            .spawn()
-        {
-            let _ = child.wait();
-            tracing::debug!("Paste via ydotool");
-            return Ok(());
+        // 3. xdotool (X11 / Fallback XWayland)
+        // ✅ IMPORTANTE: No Wayland puro, xdotool reporta sucesso mas falha silenciosamente.
+        // Só usamos se NÃO for Wayland ou se as outras falharem miseravelmente.
+        if (!is_wayland || which::which("ydotool").is_err()) && which::which("xdotool").is_ok() {
+            if let Ok(status) = Command::new("xdotool")
+                .args(["key", "--clearmodifiers", "ctrl+v"])
+                .status()
+            {
+                if status.success() {
+                    tracing::debug!("Paste via xdotool Ctrl+V");
+                    return Ok(());
+                }
+            }
         }
 
-        // xdg-open fallback: nada — o texto já está no clipboard
-        tracing::warn!("Nenhum método de paste disponível; texto está no clipboard (Ctrl+V manual)");
+        tracing::warn!("Nenhum método de paste disponível ou funcional; texto está no clipboard (Ctrl+V manual)");
         Ok(())
     }
 
@@ -240,29 +254,46 @@ impl TextInjector {
     }
 
     pub async fn send_enter(&self) -> Result<()> {
+        let is_wayland = std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland";
         std::thread::sleep(Duration::from_millis(300));
 
-        // xdotool (funciona via XWayland no KDE)
-        if let Ok(status) = Command::new("xdotool")
-            .args(["key", "--clearmodifiers", "Return"])
-            .status()
-        {
-            if status.success() {
-                tracing::debug!("Enter via xdotool");
-                return Ok(());
+        // 1. ydotool
+        if which::which("ydotool").is_ok() {
+            let socket = std::env::var("YDOTOOL_SOCKET").unwrap_or_else(|_| "/tmp/ydotoolsock".to_string());
+            if let Ok(mut child) = Command::new("ydotool")
+                .env("YDOTOOL_SOCKET", &socket)
+                .args(["key", "28:1", "28:0"])
+                .spawn()
+            {
+                if child.wait().map(|s| s.success()).unwrap_or(false) {
+                    tracing::debug!("Enter via ydotool");
+                    return Ok(());
+                }
             }
         }
 
-        // wtype
-        if let Ok(status) = Command::new("wtype").args(["-k", "Return"]).status() {
-            if status.success() {
-                tracing::debug!("Enter via wtype");
-                return Ok(());
+        // 2. wtype
+        if is_wayland && which::which("wtype").is_ok() {
+            if let Ok(status) = Command::new("wtype").args(["-k", "Return"]).status() {
+                if status.success() {
+                    tracing::debug!("Enter via wtype");
+                    return Ok(());
+                }
             }
         }
 
-        // ydotool
-        let _ = Command::new("ydotool").args(["key", "28:1", "28:0"]).spawn();
+        // 3. xdotool
+        if (!is_wayland || which::which("ydotool").is_err()) && which::which("xdotool").is_ok() {
+            if let Ok(status) = Command::new("xdotool")
+                .args(["key", "--clearmodifiers", "Return"])
+                .status()
+            {
+                if status.success() {
+                    tracing::debug!("Enter via xdotool");
+                    return Ok(());
+                }
+            }
+        }
 
         Ok(())
     }
