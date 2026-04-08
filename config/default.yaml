@@ -14,7 +14,7 @@ transcription:
   language: "pt"
   lightning_mode: false
   # ✅ FIX: Reduzido de 4000ms para 1200ms — mais responsivo
-  auto_send: false
+  auto_send: true
   silence_threshold_ms: 1200
   voice_commands_enabled: true
   always_listening: false
@@ -54,8 +54,8 @@ text_injection:
 
 # --- Inteligência Artificial ---
 ai:
-  provider: "disabled"
-  auto_formatting: false
+  provider: "groq"
+  auto_formatting: true
   ollama:
     url: "http://localhost:11434"
     api_key: ""

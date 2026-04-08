@@ -78,7 +78,17 @@ impl TranscriptionPipeline {
         // ── Fase 1: Síncrona e Ultra Rápida (Whisper -> Fitlros -> Dicionário -> Snippets) ──
         let raw_text = self.engine.transcribe(&samples)?;
         if raw_text.is_empty() {
-            return Err(LumenError::Internal("Transcrição vazia".into()));
+            tracing::debug!("Transcrição vazia, ignorando pipeline");
+            return Ok(TranscriptionRecord {
+                id: uuid::Uuid::new_v4().to_string(),
+                timestamp: chrono::Utc::now(),
+                raw_text: String::new(),
+                processed_text: String::new(),
+                word_count: 0,
+                processing_time_ms: start.elapsed().as_millis() as u64,
+                ai_used: false,
+                auto_sent: false,
+            });
         }
         tracing::debug!("Raw transcription: \"{}\"", raw_text);
 

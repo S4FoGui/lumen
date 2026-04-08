@@ -543,7 +543,7 @@ async fn handle_stop_and_process(
 
     // ✅ Verificar duração mínima (evita processar cliques acidentais/rápidos)
     let duration_ms = (samples.len() as f32 / state.config.read().await.audio.sample_rate as f32) * 1000.0;
-    if duration_ms < 500.0 {
+    if duration_ms < 200.0 {
         tracing::info!("🎤 Gravação muito curta ({:.0}ms) — descartando", duration_ms);
         return;
     }

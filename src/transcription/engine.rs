@@ -51,10 +51,10 @@ impl TranscriptionEngine {
             return Ok(String::new());
         }
 
-        // ✅ Descartar áudio muito curto (< 0.3s) — evita transcrições de ruído
+        // ✅ Descartar áudio extremamente curto (< 0.1s)
         let duration_secs = samples.len() as f64 / 16000.0;
-        if duration_secs < 0.3 {
-            tracing::debug!("Áudio muito curto ({:.2}s), ignorando", duration_secs);
+        if duration_secs < 0.1 {
+            tracing::debug!("Áudio extremamente curto ({:.2}s), ignorando", duration_secs);
             return Ok(String::new());
         }
 
@@ -88,7 +88,7 @@ impl TranscriptionEngine {
 
         // ✅ Suprimir tokens problemáticos que causam "alucinações"
         params.set_suppress_blank(true);
-        params.set_no_speech_thold(0.6); // Descartar se probabilidade de não-fala > 60%
+        params.set_no_speech_thold(0.3); // Menos agressivo (antes 0.6)
 
         if self.lightning_mode {
             params.set_n_threads(num_cpus());
