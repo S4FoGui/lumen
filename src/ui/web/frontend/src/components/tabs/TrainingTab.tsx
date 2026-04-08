@@ -26,14 +26,15 @@ export function TrainingTab() {
     "Por favor, confirme o recebimento desta mensagem."
   ];
 
-  const startRecording = async (phraseText: string) => {
+  const startRecording = async (phraseText: string, phraseIdx: number) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
-      const recordingId = Date.now().toString();
+      // ✅ FIX: Usar o índice da frase como ID para vincular à frase correta
+      const recordingId = phraseIdx.toString();
       setCurrentRecording({ id: recordingId, startTime: Date.now() });
 
       mediaRecorder.ondataavailable = (e) => {
@@ -44,7 +45,9 @@ export function TrainingTab() {
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        const duration = Math.floor((Date.now() - (currentRecording?.startTime || 0)) / 1000);
+        // ✅ FIX: Capturar startTime da closure corretamente
+        const startTime = currentRecording?.startTime || Date.now();
+        const duration = Math.floor((Date.now() - startTime) / 1000);
 
         setRecordings(prev => [...prev, {
           id: recordingId,
@@ -173,7 +176,12 @@ export function TrainingTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           {trainingPhrases.map((phrase, idx) => {
-            const isRecorded = recordings.some(r => r.text === phrase);
+            // ✅ FIX: Verificar se existe gravação para ESTA frase específica (por índice)
+            const isRecorded = recordings.some(r => r.id === idx.toString());
+            // ✅ FIX: Determinar se ESTA frase está sendo gravada agora
+            const isRecordingThisPhrase = isRecording && currentRecording?.id === idx.toString();
+            // ✅ FIX: Desabilitar outros botões quando gravando uma frase diferente
+            const isDisabled = isRecording && !isRecordingThisPhrase;
 
             return (
               <div
@@ -181,7 +189,9 @@ export function TrainingTab() {
                 className={`p-4 rounded-lg border transition-all ${
                   isRecorded
                     ? 'bg-accent/10 border-accent/30'
-                    : 'bg-secondary/20 border-border hover:border-accent/20'
+                    : isRecordingThisPhrase
+                      ? 'bg-red-500/10 border-red-500/30'
+                      : 'bg-secondary/20 border-border hover:border-accent/20'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -189,15 +199,16 @@ export function TrainingTab() {
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-mono text-muted-foreground">#{idx + 1}</span>
                       {isRecorded && <CheckCircle2 className="w-4 h-4 text-accent" />}
+                      {isRecordingThisPhrase && <span className="text-xs text-red-500 animate-pulse">● Gravando...</span>}
                     </div>
                     <p className="text-base">{phrase}</p>
                   </div>
 
                   <Button
                     size="sm"
-                    onClick={() => isRecording ? stopRecording() : startRecording(phrase)}
-                    disabled={isRecording && currentRecording?.id !== `${idx}`}
-                    className={isRecording ? "bg-red-500 hover:bg-red-600" : ""}
+                    onClick={() => isRecordingThisPhrase ? stopRecording() : startRecording(phrase, idx)}
+                    disabled={isDisabled}
+                    className={isRecordingThisPhrase ? "bg-red-500 hover:bg-red-600" : ""}
                   >
                     {isRecording && currentRecording ? (
                       <>

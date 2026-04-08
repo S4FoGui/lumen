@@ -175,9 +175,22 @@ impl TextInjector {
         
         tracing::debug!("⌨️ Simulando paste (Ctrl+V)...");
 
-        // 1. ydotool (Melhor para Wayland nativo)
+        // 1. Lumen Native Injector (Melhor para Wayland — sem dependências externas)
+        let injector_script = "tools/injector.py";
+        if std::path::Path::new(injector_script).exists() {
+            if let Ok(mut child) = Command::new("python3")
+                .args([injector_script, "paste"])
+                .spawn()
+            {
+                if child.wait().map(|s| s.success()).unwrap_or(false) {
+                    tracing::debug!("Paste via Lumen Native Injector (uinput)");
+                    return Ok(());
+                }
+            }
+        }
+
+        // 2. ydotool (Se instalado)
         if which::which("ydotool").is_ok() {
-            // Tenta usar o socket do ydotool se o daemon estiver rodando
             let socket = std::env::var("YDOTOOL_SOCKET").unwrap_or_else(|_| "/tmp/ydotoolsock".to_string());
             if let Ok(mut child) = Command::new("ydotool")
                 .env("YDOTOOL_SOCKET", &socket)
@@ -191,7 +204,7 @@ impl TextInjector {
             }
         }
 
-        // 2. wtype (Wayland nativo — foca no protocolo do compositor)
+        // 3. wtype (Wayland nativo — foca no protocolo do compositor)
         if is_wayland && which::which("wtype").is_ok() {
             if let Ok(mut child) = Command::new("wtype")
                 .args(["-M", "ctrl", "-k", "v", "-m", "ctrl"])
@@ -204,9 +217,7 @@ impl TextInjector {
             }
         }
 
-        // 3. xdotool (X11 / Fallback XWayland)
-        // ✅ IMPORTANTE: No Wayland puro, xdotool reporta sucesso mas falha silenciosamente.
-        // Só usamos se NÃO for Wayland ou se as outras falharem miseravelmente.
+        // 4. xdotool (X11 / Fallback XWayland)
         if (!is_wayland || which::which("ydotool").is_err()) && which::which("xdotool").is_ok() {
             if let Ok(status) = Command::new("xdotool")
                 .args(["key", "--clearmodifiers", "ctrl+v"])
@@ -257,7 +268,21 @@ impl TextInjector {
         let is_wayland = std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland";
         std::thread::sleep(Duration::from_millis(300));
 
-        // 1. ydotool
+        // 1. Lumen Native Injector (uinput)
+        let injector_script = "tools/injector.py";
+        if std::path::Path::new(injector_script).exists() {
+            if let Ok(mut child) = Command::new("python3")
+                .args([injector_script, "enter"])
+                .spawn()
+            {
+                if child.wait().map(|s| s.success()).unwrap_or(false) {
+                    tracing::debug!("Enter via Lumen Native Injector (uinput)");
+                    return Ok(());
+                }
+            }
+        }
+
+        // 2. ydotool
         if which::which("ydotool").is_ok() {
             let socket = std::env::var("YDOTOOL_SOCKET").unwrap_or_else(|_| "/tmp/ydotoolsock".to_string());
             if let Ok(mut child) = Command::new("ydotool")
@@ -272,7 +297,7 @@ impl TextInjector {
             }
         }
 
-        // 2. wtype
+        // 3. wtype
         if is_wayland && which::which("wtype").is_ok() {
             if let Ok(status) = Command::new("wtype").args(["-k", "Return"]).status() {
                 if status.success() {
@@ -282,7 +307,7 @@ impl TextInjector {
             }
         }
 
-        // 3. xdotool
+        // 4. xdotool
         if (!is_wayland || which::which("ydotool").is_err()) && which::which("xdotool").is_ok() {
             if let Ok(status) = Command::new("xdotool")
                 .args(["key", "--clearmodifiers", "Return"])
