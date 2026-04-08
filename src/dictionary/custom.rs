@@ -66,11 +66,13 @@ impl CustomDictionary {
     }
 
     /// Lista todas as entradas
+    #[allow(dead_code)]
     pub fn list(&self) -> &HashMap<String, String> {
         &self.entries
     }
 
     /// Retorna entries owned (para serialização)
+    #[allow(dead_code)]
     pub fn entries_owned(&self) -> HashMap<String, String> {
         self.entries.clone()
     }

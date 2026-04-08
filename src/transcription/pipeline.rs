@@ -5,7 +5,6 @@ use tokio::sync::RwLock;
 use crate::ai::commands::{CommandDetector, VoiceCommand};
 use crate::analytics::Analytics;
 use crate::state::{LumenEvent, LumenState, TranscriptionRecord};
-use crate::text::auto_send::AutoSender;
 use crate::text::injector::TextInjector;
 use crate::transcription::engine::TranscriptionEngine;
 use crate::transcription::filler_filter::FillerFilter;
@@ -20,7 +19,6 @@ pub struct TranscriptionPipeline {
     filler_filter: FillerFilter,
     command_detector: CommandDetector,
     text_injector: Arc<RwLock<TextInjector>>,
-    auto_sender: AutoSender,
     analytics_db: Arc<Analytics>,
 }
 
@@ -44,7 +42,6 @@ impl TranscriptionPipeline {
             filler_filter,
             command_detector: CommandDetector::new(),
             text_injector,
-            auto_sender: AutoSender::new(150),
             analytics_db,
         }
     }
@@ -152,7 +149,6 @@ impl TranscriptionPipeline {
         // ── FASE 2: Injeção ou IA Assíncrona ──
         let state_clone = Arc::clone(&self.state);
         let injector_clone = Arc::clone(&self.text_injector);
-        let sender_clone = self.auto_sender.clone();
         let db_clone = Arc::clone(&self.analytics_db);
         let fast_text = processed.clone();
         let cmd = command.clone();
@@ -173,7 +169,7 @@ impl TranscriptionPipeline {
 
                 // Dispara Background apenas para banco e auto-sender
                 tokio::spawn(async move {
-                    Self::handle_auto_send(&cmd, fast_text.clone(), state_clone.clone(), sender_clone).await;
+                    Self::handle_auto_send(&cmd, fast_text.clone(), state_clone.clone(), injector_clone).await;
                     Self::save_history(rid, raw_for_bg, fast_text, word_count, processing_time_ms, false, false, db_clone).await;
                 });
             }
@@ -213,15 +209,16 @@ impl TranscriptionPipeline {
                         }
                     }
 
-                    // Injeta a String final (Refinada ou Bruta fallback)
-                    let injector = injector_clone.read().await;
-                    if let Err(e) = injector.inject(&final_text).await {
-                        tracing::error!("Falha ao injetar texto (Pós-IA): {}", e);
-                    } else {
-                        state_clone.emit(LumenEvent::InjectionComplete { text: final_text.clone() });
-                    }
+                    {
+                        let injector = injector_clone.read().await;
+                        if let Err(e) = injector.inject(&final_text).await {
+                            tracing::error!("Falha ao injetar texto (Pós-IA): {}", e);
+                        } else {
+                            state_clone.emit(LumenEvent::InjectionComplete { text: final_text.clone() });
+                        }
+                    } // Trava do injector liberada aqui
 
-                    Self::handle_auto_send(&cmd, final_text.clone(), state_clone.clone(), sender_clone).await;
+                    Self::handle_auto_send(&cmd, final_text.clone(), state_clone.clone(), injector_clone).await;
                     Self::save_history(rid, raw_for_bg, final_text, word_count, processing_time_ms, ai_used, false, db_clone).await;
                 });
             }
@@ -244,7 +241,7 @@ impl TranscriptionPipeline {
         command: &VoiceCommand,
         text: String,
         state: Arc<LumenState>,
-        sender: AutoSender,
+        injector: Arc<RwLock<TextInjector>>,
     ) -> bool {
         let auto_send_config = state.config.read().await.transcription.auto_send;
         let should_send = match command {
@@ -260,7 +257,8 @@ impl TranscriptionPipeline {
         };
 
         if should_send && !text.is_empty() {
-            match sender.send_enter() {
+            let injector_lock = injector.read().await;
+            match injector_lock.send_enter().await {
                 Ok(()) => {
                     tracing::info!("⏎ Enter pressionado automaticamente");
                     true

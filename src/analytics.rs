@@ -141,6 +141,7 @@ impl Analytics {
     }
 
     /// Obtém estatísticas globais precomputadas (lifetime).
+    #[allow(dead_code)]
     pub fn get_global_stats(&self) -> Result<(u64, u64)> {
         let db = self.db.lock().map_err(|_| LumenError::Internal("Mutex envenenado".into()))?;
         let mut stmt = db.prepare(

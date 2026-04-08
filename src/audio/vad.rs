@@ -127,10 +127,12 @@ impl VoiceActivityDetector {
         self.noise_floor = self.initial_threshold;
     }
 
+    #[allow(dead_code)]
     pub fn has_detected_voice(&self) -> bool {
         self.has_detected_voice
     }
 
+    #[allow(dead_code)]
     pub fn current_rms(&self) -> f32 {
         self.smoothed_rms
     }

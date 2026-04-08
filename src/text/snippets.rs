@@ -77,6 +77,7 @@ impl SnippetManager {
     }
 
     /// Retorna os entries como owned HashMap (para serialização)
+    #[allow(dead_code)]
     pub fn entries_owned(&self) -> HashMap<String, String> {
         self.entries.clone()
     }

@@ -184,6 +184,7 @@ impl Overlay {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn show_transcription(&mut self, text: &str) -> Result<()> {
         let _ = self.sender.try_send(OverlayMessage::UpdateTranscription(text.to_string()));
         Ok(())

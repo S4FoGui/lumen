@@ -131,10 +131,12 @@ impl TranscriptionEngine {
         Ok(text)
     }
 
+    #[allow(dead_code)]
     pub fn set_lightning_mode(&mut self, enabled: bool) {
         self.lightning_mode = enabled;
     }
 
+    #[allow(dead_code)]
     pub fn is_lightning_mode(&self) -> bool {
         self.lightning_mode
     }
