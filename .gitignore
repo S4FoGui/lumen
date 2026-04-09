@@ -21,6 +21,7 @@ Cargo.lock
 # Local Config & Secrets
 .env
 .env.*
+.mcp.json
 .claude/settings.local.json
 /config/local_config.yaml
 
@@ -30,6 +31,7 @@ dist/
 .eslintcache
 
 # Tools & Local
+.system/
 .gemini/
 .cursor/
 .vscode/
