@@ -100,7 +100,13 @@ impl AudioCapture {
         let stream = device
             .build_input_stream(
                 &config,
-                move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                move |data: &[f32], info: &cpal::InputCallbackInfo| {
+                    // Log de diagnóstico sutil para monitorar latência ou falhas
+                    let capture_time = info.timestamp().callback.duration_since(&info.timestamp().capture).map(|d| d.as_micros()).unwrap_or(0);
+                    if capture_time > 50000 { // > 50ms
+                         tracing::debug!("⚠️ Latência de captura alta: {}us", capture_time);
+                    }
+
                     // 1. Downmix para mono se necessário
                     let mono: Vec<f32> = if src_channels > 1 {
                         data.chunks(src_channels)
@@ -111,7 +117,6 @@ impl AudioCapture {
                     };
                     
                     if let Some(ref mut ds) = denoiser {
-                        // MODALIDADE 1: Com Supressão de Ruído (RNNoise)
                         // A) Resample nativo -> 48kHz (RNNoise fixo)
                         let mono_48k = if src_rate != 48000 {
                             resample(&mono, src_rate, 48000)
@@ -167,9 +172,10 @@ impl AudioCapture {
     /// Para a gravação e retorna as amostras capturadas.
     /// As amostras são em formato f32, 16kHz, mono.
     pub fn stop(&mut self) -> Result<Vec<f32>> {
-        // Drop the stream to stop recording
-        self.stream.take();
-        tracing::info!("🛑 Gravação parada");
+        if let Some(stream) = self.stream.take() {
+            drop(stream);
+            tracing::info!("🛑 Gravação parada");
+        }
 
         let samples = {
             if let Ok(mut buffer) = self.samples.lock() {

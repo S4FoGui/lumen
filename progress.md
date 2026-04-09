@@ -1,60 +1,61 @@
-# 📈 Progress Tracking
+# Log de Mudanças e Correções - 09/04/2026
 
-## [2026-04-05] MCP Integration Initialized
-- **Task:** Install shadcn/ui MCP server.
-- **Protocol:** B.L.A.S.T. initialized.
-- **Status:** 🟢 Constitution (`claude.md`) initialized.
-- **Status:** 🟢 Action Plan (`task_plan.md`) updated with Phase 6 (shadcn & convex).
-- **Status:** 🟢 Data Schema (`gemini.md`) updated with MCP configurations.
-- **Status:** 🟢 Global Config Updated (`mcp_config.json`).
+## Sessão 2 (Tarde/Noite) - Bug Fixes e Modo Manual
 
-## [2026-04-07] File Structure Reorganization
-- **Task:** Organizar arquivos da raiz do projeto seguindo a arquitetura A.N.T.
-- **Protocol fase:** Architect (Layer 1 Maintenance)
-- **Status:** 🟢 Documentação técnica movida para `architecture/`.
-- **Status:** 🟢 Manuais e guias movidos para `docs/`.
-- **Status:** 🟢 Scripts de teste e depuração movidos para `tests/scripts/`.
-- **Status:** 🟢 Modelo Whisper movido para `models/`.
-- **Status:** 🟢 Ativos visuais movidos para `assets/`.
-- **Status:** 🟢 `claude.md` atualizado com o mapa de estrutura de arquivos.
-- **Status:** 🟢 Diretórios vazios (`summary_portifolio_dados/`) removidos.
+### 4. Correção de Erros Lógicos Críticos
+- **Arquivos:** `src/main.rs`, `src/audio/capture.rs`
+- **Ações:**
+    - Adicionado debounce compartilhado entre hotkey e tray (evita toggles duplos)
+    - Verificação de estado de gravação no Always Listening (previene race condition)
+    - Verificação de texto vazio no modo normal (consistência com Always Listening)
+    - Correção do tipo de retorno `stop()` de `&self` para `&mut self`
+    - Limpeza de buffer de amostras no `stop()` para evitar vazamento entre sessões
+- **Resultado:** Maior estabilidade no estado de gravação, prevenção de gravações duplicadas.
 
-## [2026-04-07] Token Saver MCP Integration
-- **Task:** Adaptar e instalar o `token-saver-mcp`.
-- **Protocol fase:** Trigger (Phase 5 Completion)
-- **Status:** 🟢 Diretório `~/token-saver-mcp` criado e inicializado.
-- **Status:** 🟢 MCP Server implementado com tools de sumarização e árvore de projeto.
-- **Status:** 🟢 SOP técnico criado em `architecture/token_saver_mcp.md`.
-- **Status:** 🟢 Configuração registrada em `mcp_config.json`.
-- **Status:** 🟢 Ferramentas validadas no console MCP.
+### 5. Modo 100% Manual (Always Listening Desativado)
+- **Arquivo:** `src/main.rs`
+- **Ações:**
+    - Forçado `always_listening = false` permanentemente
+    - Removida inicialização automática no startup
+    - Ignorada reativação via mudanças de config no dashboard
+    - Removido reinício assíncrono após transcrição
+- **Resultado:** Lumen só ativa via hotkey (2x Enter), comportamento 100% manual como solicitado.
 
-## [2026-04-08] Conclusão Geral e Estabilização
-- **Task:** Finalizar ciclo v1.0.2 e consolidar ecossistema MCP.
-- **Protocol fase:** Trigger (Final Deployment)
-- **Status:** 🟢 Lumen validado com sucesso: áudio funcionando sem conflito ALSA/PipeWire.
-- **Status:** 🟢 VAD e Beam Search testados (acurácia superior em PT-BR).
-- **Status:** 🟢 Token Saver MCP totalmente integrado e documentado na Constituição.
-- **Status:** 🟢 Todas as fases do `task_plan.md` concluídas.
+### 6. Comportamento Modal (Overlay Abre/Fecha)
+- **Arquivo:** `src/ui/overlay.rs`
+- **Ações:**
+    - Auto-dismiss após 3 segundos de idle → opacidade 0
+    - `HideRecording`: fecha completamente (opacidade 0, `visible = false`)
+    - Quando opacidade chega a 0, janela é escondida completamente
+    - `ShowRecording`: reaparece do zero quando 2x Enter é pressionado
+- **Resultado:** Overlay funciona como dialog modal: aparece, processa, **fecha completamente** (não minimiza, não fica cinza).
 
-### 📊 Dashboard e Estados (v1.0.4)
-- [x] Corrigir erro de Sincronização Global (Split Brain)
-- [x] Implementar `reload()` em `SnippetManager` e `CustomDictionary`
-- [x] Sincronizar live-components no endpoint `api_update_config`
-- [x] Validar thread-safety do Analytics DB
+### 7. Overlay True Always-on-Top (Wayland)
+- **Arquivo:** `src/ui/overlay.rs`
+- **Ação:** Configurado `gtk4-layer-shell` com `Layer::Overlay` quando feature `wayland-overlay` está ativa
+- **Instrução de uso:** Compilar com `cargo run --features wayland-overlay` para overlay que nunca minimiza
+- **Resultado:** No Wayland, overlay fica sempre no topo independente do foco. No X11, comportamento depende do WM.
 
-### 🔧 Estabilização e Groq (v1.0.5)
-- [x] Implementar diagnósticos detalhados para falhas da API Groq
-- [x] Limpeza técnica: redução de warnings (16 para 7)
-- [x] Corrigir bugs de sintaxe em `main.rs` e `overlay.rs`
+---
 
-### 🎙️ Ondas Vivas (v1.0.6)
-- [x] Implementar `SetVolume(f32)` no pipeline de mensagens do Overlay
-- [x] Renderização reativa de áudio: barras de volume pulsam com a fala
-- [x] Sincronização de RMS em tempo real via WebSocket para o Dashboard
+## Sessão 1 (Manhã) - Melhorias Iniciais
 
-### 🛡️ Supressão e Estabilidade (v1.0.9 - 1.2.1)
-- [x] Integração de RNNoise (nnnoiseless) para remoção de ruído via IA
-- [x] Física de Ondas Líquidas: Animação premium com volume suavizado (EMA)
-- [x] Lifecycle do Overlay: Auto-dismiss (5s) e consciência de estado (is_recording)
-- [x] Otimização Zero-Latency: Migração para modelo `base` e `lightning_mode`
-- [x] Eliminação total de warnings de compilação
+## 1. Melhorias na Visualização (Waveform)
+- **Arquivo:** `src/ui/web/frontend/src/components/Waveform.tsx`
+- **Ação:** Substituído o renderizador de ondas baseado em múltiplas camadas SVG/Canvas por uma implementação baseada em `requestAnimationFrame` com interpolação linear (LERP).
+- **Resultado:** Eliminação do "flicker" (cintilação) da animação, maior fluidez no movimento e estética visual mais moderna com gradientes contínuos.
+
+## 2. Otimização na Captura de Áudio (Backend)
+- **Arquivo:** `src/audio/capture.rs`
+- **Ação:** 
+    - Substituído `cpal::BufferSize::Default` por `cpal::BufferSize::Fixed(480)`.
+    - Adicionado log de diagnóstico para monitorar latência no callback de captura.
+- **Resultado:** Estabilização do buffer de áudio para o processamento via `RNNoise`, reduzindo latência e evitando "pulsos" na captura sonora.
+
+## 3. Correção de Gerenciamento de Janela (UI/UX)
+- **Arquivo:** `src/ui/overlay.rs`
+- **Ação:** 
+    - Adicionado `window.present()` ao evento `ShowRecording`.
+    - Alterado `ApplicationFlags::NON_UNIQUE` para `ApplicationFlags::FLAGS_NONE`.
+    - Implementada proteção no `Drop` através do campo `is_owner` para evitar encerramento prematuro da thread GUI por instâncias secundárias (proxy).
+- **Resultado:** A interface do overlay agora mantém uma instância única, não fecha inesperadamente e traz a janela para o plano de frente (focus) corretamente ao iniciar a gravação.

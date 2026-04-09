@@ -7,8 +7,14 @@ type WaveformProps = {
 
 export function WaveformVisualizer({ rms, isRecording }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const phaseRef = useRef(0);
-  const smoothedRmsRef = useRef(0);
+  const targetRms = useRef(0);
+  const currentRms = useRef(0);
+  const phase = useRef(0);
+
+  // Atualiza o alvo sempre que o prop mudar
+  useEffect(() => {
+    targetRms.current = rms;
+  }, [rms]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -19,102 +25,49 @@ export function WaveformVisualizer({ rms, isRecording }: WaveformProps) {
     let animationFrameId: number;
 
     const render = () => {
-      // Limpar canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Suavizar a entrada de RMS para evitar saltos bruscos na animação
-      smoothedRmsRef.current += (rms - smoothedRmsRef.current) * 0.2;
-      
       const width = canvas.width;
       const height = canvas.height;
-      const centerY = height / 2;
       
-      // Ganho dinâmico: mais sensível para pequenos volumes
-      const activityLevel = isRecording ? Math.min(smoothedRmsRef.current * 12, 1.2) : 0;
+      // Interpolação suave (LERP) para o volume (input)
+      currentRms.current += (targetRms.current - currentRms.current) * 0.15;
+      const intensity = isRecording ? Math.max(0.2, currentRms.current * 10) : 0.2;
       
-      // Incrementar fase para movimento contínuo
-      phaseRef.current += 0.05 + activityLevel * 0.1;
+      phase.current += 0.15 + (intensity * 0.5);
 
-      // Desenhar 3 camadas de ondas
-      const drawWave = (
-        opacity: number, 
-        amplitudeMult: number, 
-        freqMult: number, 
-        phaseOffset: number,
-        lineWidth: number
-      ) => {
-        ctx.beginPath();
-        ctx.strokeStyle = `rgba(163, 230, 53, ${opacity})`;
-        ctx.lineWidth = lineWidth;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
+      ctx.clearRect(0, 0, width, height);
 
-        // Efeito de Glow sutil
-        if (isRecording) {
-            ctx.shadowBlur = 15 * activityLevel;
-            ctx.shadowColor = 'rgba(163, 230, 53, 0.4)';
-        }
+      // Gradiente moderno
+      const gradient = ctx.createLinearGradient(0, 0, width, 0);
+      gradient.addColorStop(0, 'rgba(163, 230, 53, 0.6)');
+      gradient.addColorStop(0.5, 'rgba(163, 230, 53, 1.0)');
+      gradient.addColorStop(1, 'rgba(163, 230, 53, 0.6)');
 
-        for (let x = 0; x <= width; x += 2) {
-          // Curva de sino para manter as pontas finas e o meio volumoso
-          const normalizePosition = x / width;
-          const bellCurve = Math.sin(normalizePosition * Math.PI);
-          
-          // Equação da onda: sen(x * freq + fase)
-          // Adicionamos variação baseada no activityLevel
-          const wave = Math.sin(normalizePosition * Math.PI * 2 * freqMult + phaseRef.current + phaseOffset);
-          
-          // Amplitude depende do volume e da posição (bell curve)
-          const amplitude = (height * 0.4) * activityLevel * amplitudeMult * bellCurve;
-          
-          const y = centerY + wave * amplitude;
+      ctx.beginPath();
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 3;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
 
-          if (x === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-        ctx.shadowBlur = 0; // Reset shadow
-      };
-
-      if (isRecording) {
-        // Camada 3 (Fundo, lenta, larga)
-        drawWave(0.15, 0.6, 0.8, phaseRef.current * 0.5, 2);
-        // Camada 2 (Meio, média)
-        drawWave(0.3, 0.8, 1.2, -phaseRef.current * 0.3, 3);
-        // Camada 1 (Frente, rápida, detalhada)
-        drawWave(0.9, 1.0, 1.5, phaseRef.current, 4);
-      } else {
-        // Linha base estática pulsante sutil
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(163, 230, 53, 0.2)';
-        ctx.lineWidth = 2;
-        ctx.moveTo(0, centerY);
-        ctx.lineTo(width, centerY);
-        ctx.stroke();
+      for (let x = 0; x <= width; x++) {
+        const progress = x / width;
+        const sine = Math.sin(progress * Math.PI * 3 + phase.current);
+        const y = (height / 2) + (sine * intensity * 20 * Math.sin(progress * Math.PI));
+        
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       }
-
+      
+      ctx.stroke();
       animationFrameId = requestAnimationFrame(render);
     };
 
     render();
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [rms, isRecording]);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [isRecording]);
 
   return (
-    <div className="relative w-full h-16 flex items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-secondary/20">
-      {/* Background pulsante sutil se gravando */}
-      {isRecording && (
-        <div className="absolute inset-0 bg-accent/5 animate-pulse" />
-      )}
-      <canvas 
-        ref={canvasRef} 
-        width={400} 
-        height={64} 
-        className="w-full h-full max-w-sm"
-      />
+    <div className="w-full h-16 bg-black/5 rounded-lg overflow-hidden border border-white/10">
+      <canvas ref={canvasRef} width={400} height={64} className="w-full h-full" />
     </div>
   );
 }

@@ -126,6 +126,21 @@ impl TranscriptionPipeline {
             processed = snippets.process(&processed);
         }
 
+        // ✅ Verificar se o texto processado ficou vazio (ex: só continha [MUSIC], fillers, etc)
+        if processed.trim().is_empty() {
+            tracing::debug!("Texto processado ficou vazio após filtros, ignorando pipeline");
+            return Ok(TranscriptionRecord {
+                id: uuid::Uuid::new_v4().to_string(),
+                timestamp: chrono::Utc::now(),
+                raw_text,
+                processed_text: String::new(),
+                word_count: 0,
+                processing_time_ms: start.elapsed().as_millis() as u64,
+                ai_used: false,
+                auto_sent: false,
+            });
+        }
+
         // ── FASE 2: Injeção Imediata (Antes da atualização visual para proteger o foco) ──
         let strategy = self.determine_strategy(&command).await;
         let fast_text = processed.clone();

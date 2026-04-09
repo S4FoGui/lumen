@@ -101,7 +101,8 @@ async fn main() -> Result<()> {
     let open_on_start = config.ui.open_on_start;
     let show_tray = config.ui.show_tray;
     let silence_threshold_ms = config.transcription.silence_threshold_ms;
-    let mut always_listening = config.transcription.always_listening;
+    // Always Listening DESATIVADO - comportamento 100% manual via hotkey (2x Enter)
+    let mut always_listening = false;
     let mut wake_word = config.transcription.wake_word.to_lowercase();
 
     // 1. Analytics DB
@@ -228,64 +229,38 @@ async fn main() -> Result<()> {
     // Canal para VAD enviar sinal de fim de fala
     let (vad_tx, mut vad_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
 
-    if always_listening && !recording {
-        tracing::info!("🎧 Always Listening ativo (wake word: '{}')", wake_word);
-        handle_toggle_recording(
-            &mut recording,
-            &lumen_state,
-            &audio_capture,
-            &pipeline,
-            &mut overlay,
-            &vad,
-            &vad_tx,
-        ).await;
-    }
+    // Modo 100% manual - aguardando hotkey (2x Enter) para iniciar
 
     // Subscrever ao event bus para reagir a mudanças de config em tempo real
     let mut config_event_rx = lumen_state.event_tx.subscribe();
 
     loop {
         tokio::select! {
-            // Reagir a mudanças de config (always_listening pode ter sido alterado via dashboard)
+            // Reagir a mudanças de config (always_listening ignorado - comportamento 100% manual)
             Ok(event) = config_event_rx.recv() => {
                 if matches!(event, LumenEvent::ConfigChanged) {
                     let new_config = lumen_state.config.read().await;
-                    let new_always_listening = new_config.transcription.always_listening;
+                    let _new_always_listening = new_config.transcription.always_listening;
                     let new_wake_word = new_config.transcription.wake_word.to_lowercase();
                     drop(new_config);
 
-                    if new_always_listening && !recording {
-                        tracing::info!("🎧 Config changed: ativando Always Listening (wake word: '{}')", new_wake_word);
-                        always_listening = true;
-                        wake_word = new_wake_word;
-                        handle_toggle_recording(
+                    // Always Listening está DESATIVADO - sempre força false
+                    // Ignora qualquer tentativa de ativação via dashboard
+                    if always_listening && recording {
+                        // Se por algum motivo estiver gravando, para
+                        tracing::info!("🎧 Modo manual: parando gravação ativa");
+                        handle_stop_and_process(
                             &mut recording,
                             &lumen_state,
                             &audio_capture,
                             &pipeline,
                             &mut overlay,
-                            &vad,
-                            &vad_tx,
+                            false,
+                            "lumen",
                         ).await;
-                    } else if !new_always_listening && always_listening {
-                        tracing::info!("🎧 Config changed: desativando Always Listening");
-                        always_listening = false;
-                        wake_word = new_wake_word;
-                        if recording {
-                            handle_stop_and_process(
-                                &mut recording,
-                                &lumen_state,
-                                &audio_capture,
-                                &pipeline,
-                                &mut overlay,
-                                false,
-                                "lumen",
-                            ).await;
-                        }
-                    } else {
-                        always_listening = new_always_listening;
-                        wake_word = new_wake_word;
                     }
+                    always_listening = false;
+                    wake_word = new_wake_word;
                 }
             }
 
@@ -337,47 +312,7 @@ async fn main() -> Result<()> {
                         always_listening,
                         &wake_word,
                     ).await;
-
-                    // Reinício assíncrono do Always Listening (NÃO BLOQUEANTE)
-                    if always_listening && !recording {
-                        let lumen_state_c = Arc::clone(&lumen_state);
-                        let audio_capture_c = Arc::clone(&audio_capture);
-                        let pipeline_c = pipeline.clone();
-                        let overlay_tx_c = overlay.clone_sender();
-                        let vad_c = Arc::clone(&vad);
-                        let vad_tx_c = vad_tx.clone();
-                        let wake_word_c = wake_word.clone();
-
-                        tokio::spawn(async move {
-                            tracing::info!("🎧 Always Listening: aguardando 0.5s para reativar...");
-                            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                            
-                            // Verificar se o modo ainda está ativo após o sono
-                            let config = lumen_state_c.config.read().await;
-                            if !config.transcription.always_listening {
-                                return;
-                            }
-                            drop(config);
-
-                            tracing::info!("🎧 Reiniciando escuta (wake word: '{}')", wake_word_c);
-                            
-                            // Recria o componente overlay temporário para a chamada
-                            let mut overlay_c = ui::overlay::Overlay::from_sender(overlay_tx_c);
-                            
-                            // Flag dummy mutável para satisfazer a assinatura
-                            let mut rec_flag = false;
-                            
-                            handle_toggle_recording(
-                                &mut rec_flag,
-                                &lumen_state_c,
-                                &audio_capture_c,
-                                &pipeline_c,
-                                &mut overlay_c,
-                                &vad_c,
-                                &vad_tx_c,
-                            ).await;
-                        });
-                    }
+                    // Modo 100% manual - sem reinício automático
                 }
             }
 
@@ -393,6 +328,14 @@ async fn main() -> Result<()> {
             while let Ok(event) = tray_rx.try_recv() {
                 match event {
                     ui::tray::TrayEvent::ToggleRecording => {
+                        // Debounce compartilhado com hotkey para evitar toggles duplos
+                        let now = tokio::time::Instant::now();
+                        if now.duration_since(last_toggle) < tokio::time::Duration::from_millis(800) {
+                            tracing::debug!("Tray debounce: ignorando toggle rápido");
+                            continue;
+                        }
+                        last_toggle = now;
+
                         if always_listening {
                             tracing::info!("🎧 Always Listening ativo: toggle do tray ignorado");
                         } else {
@@ -612,9 +555,12 @@ async fn handle_stop_and_process(
                             }
                         }
                     } else if !record.processed_text.is_empty() {
+                        // Modo normal: também verificar texto vazio antes de enviar ao overlay
                         let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::UpdateTranscription(record.processed_text.clone()));
                         tokio::time::sleep(tokio::time::Duration::from_secs(4)).await;
                         let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::HideRecording);
+                    } else {
+                        tracing::debug!("Modo normal: texto processado está vazio, não exibindo no overlay");
                     }
                 }
                 Err(e) => {
