@@ -13,18 +13,21 @@ pub struct AudioCapture {
     device_name: Option<String>,
     /// Taxa de amostragem alvo
     target_sample_rate: u32,
+    /// Se a supressão de ruído (RNNoise) está ativa
+    noise_suppression: bool,
 }
 
 impl AudioCapture {
     /// Cria uma nova instância de captura de áudio.
     /// `device_name`: None para o dispositivo padrão do sistema.
     /// `sample_rate`: Taxa de amostragem alvo (16000 para Whisper).
-    pub fn new(device_name: Option<String>, sample_rate: u32) -> Self {
+    pub fn new(device_name: Option<String>, sample_rate: u32, noise_suppression: bool) -> Self {
         Self {
             samples: Arc::new(Mutex::new(Vec::new())),
             stream: None,
             device_name,
             target_sample_rate: sample_rate,
+            noise_suppression,
         }
     }
 
@@ -84,6 +87,16 @@ impl AudioCapture {
         let src_channels = native_channels as usize;
         let src_rate = native_sample_rate;
 
+        let mut denoiser = if self.noise_suppression {
+            tracing::info!("✨ Supressão de ruído IA ativa (RNNoise)");
+            Some(nnnoiseless::DenoiseState::new())
+        } else {
+            None
+        };
+        
+        // Buffer para acumular amostras para o RNNoise (precisa de 480 amostras @ 48kHz)
+        let mut rnnoise_accumulation = Vec::new();
+
         let stream = device
             .build_input_stream(
                 &config,
@@ -97,31 +110,44 @@ impl AudioCapture {
                         data.to_vec()
                     };
                     
-                    // 2. Resample para 16kHz se necessário
-                    let resampled = if src_rate != target_rate {
-                        let ratio = target_rate as f64 / src_rate as f64;
-                        let out_len = (mono.len() as f64 * ratio) as usize;
-                        let mut out = Vec::with_capacity(out_len);
-                        for i in 0..out_len {
-                            let src_idx = i as f64 / ratio;
-                            let idx = src_idx as usize;
-                            let frac = src_idx - idx as f64;
-                            let sample = if idx + 1 < mono.len() {
-                                mono[idx] * (1.0 - frac as f32) + mono[idx + 1] * frac as f32
-                            } else if idx < mono.len() {
-                                mono[idx]
-                            } else {
-                                0.0
-                            };
-                            out.push(sample);
+                    if let Some(ref mut ds) = denoiser {
+                        // MODALIDADE 1: Com Supressão de Ruído (RNNoise)
+                        // A) Resample nativo -> 48kHz (RNNoise fixo)
+                        let mono_48k = if src_rate != 48000 {
+                            resample(&mono, src_rate, 48000)
+                        } else {
+                            mono
+                        };
+
+                        rnnoise_accumulation.extend_from_slice(&mono_48k);
+
+                        // B) Processar frames de 480 amostras
+                        while rnnoise_accumulation.len() >= 480 {
+                            let mut input_frame = [0.0f32; 480];
+                            input_frame.copy_from_slice(&rnnoise_accumulation[..480]);
+                            rnnoise_accumulation.drain(..480);
+
+                            let mut output_frame = [0.0f32; 480];
+                            ds.process_frame(&mut output_frame, &input_frame);
+
+                            // C) Resample 48kHz -> 16kHz (Target Whisper)
+                            let denoised_16k = resample(&output_frame, 48000, target_rate);
+                            
+                            if let Ok(mut samples) = samples_clone.lock() {
+                                samples.extend_from_slice(&denoised_16k);
+                            }
                         }
-                        out
                     } else {
-                        mono
-                    };
-                    
-                    if let Ok(mut samples) = samples_clone.lock() {
-                        samples.extend_from_slice(&resampled);
+                        // MODALIDADE 2: Sem Supressão (Direto)
+                        let resampled = if src_rate != target_rate {
+                            resample(&mono, src_rate, target_rate)
+                        } else {
+                            mono
+                        };
+                        
+                        if let Ok(mut samples) = samples_clone.lock() {
+                            samples.extend_from_slice(&resampled);
+                        }
                     }
                 },
                 move |err| {
@@ -256,5 +282,29 @@ impl AudioCapture {
     pub fn samples_ref(&self) -> Arc<Mutex<Vec<f32>>> {
         Arc::clone(&self.samples)
     }
+}
+
+/// Helper local para resampling linear
+fn resample(input: &[f32], src_rate: u32, target_rate: u32) -> Vec<f32> {
+    if src_rate == target_rate {
+        return input.to_vec();
+    }
+    let ratio = target_rate as f64 / src_rate as f64;
+    let out_len = (input.len() as f64 * ratio) as usize;
+    let mut out = Vec::with_capacity(out_len);
+    for i in 0..out_len {
+        let src_idx = i as f64 / ratio;
+        let idx = src_idx as usize;
+        let frac = src_idx - idx as f64;
+        let sample = if idx + 1 < input.len() {
+            input[idx] * (1.0 - frac as f32) + input[idx + 1] * frac as f32
+        } else if idx < input.len() {
+            input[idx]
+        } else {
+            0.0
+        };
+        out.push(sample);
+    }
+    out
 }
 

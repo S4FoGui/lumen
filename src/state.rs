@@ -128,10 +128,11 @@ pub enum LumenEvent {
 
     TranscriptionComplete {
         id: String,
-        raw: String,
-        processed: String,
-        words: u64,
+        raw_text: String,
+        processed_text: String,
+        word_count: u64,
         processing_time_ms: u64,
+        ai_used: bool,
         auto_sent: bool,
     },
 

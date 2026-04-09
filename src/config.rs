@@ -22,6 +22,8 @@ pub struct AudioConfig {
     pub device: Option<String>,
     pub sample_rate: u32,
     pub channels: u16,
+    #[serde(default = "default_true")]
+    pub noise_suppression: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -104,12 +104,21 @@ impl TextInjector {
         // ✅ Delay antes de injetar (deixa tempo para o foco voltar à janela alvo)
         std::thread::sleep(Duration::from_millis(self.delay_ms));
 
+        // ✅ Melhoria v1.0.5: No Wayland, se o texto for curto, prefere digitação direta
+        let is_wayland = std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland";
+        if is_wayland && text.len() < 60 {
+            if self.simulate_type_text(text).is_ok() {
+                tracing::info!("✅ Texto digitado diretamente com sucesso");
+                return Ok(());
+            }
+        }
+
         match self.method {
             InjectionMethod::ClipboardPaste => {
                 // Copiar para clipboard e colar
                 self.copy_to_clipboard(text)?;
-                // Delay extra para o clipboard estar pronto e a janela focar (KDE 6 é lento e rigoroso)
-                std::thread::sleep(Duration::from_millis(600));
+                // Delay extra para o clipboard estar pronto e a janela focar
+                std::thread::sleep(Duration::from_millis(400));
                 self.simulate_paste()?;
             }
             _ => {
@@ -175,7 +184,20 @@ impl TextInjector {
         
         tracing::debug!("⌨️ Simulando paste (Ctrl+V)...");
 
-        // 1. Lumen Native Injector (Melhor para Wayland — sem dependências externas)
+        // 1. wtype (Wayland nativo — Mais confiável em protocolos modernos)
+        if is_wayland && which::which("wtype").is_ok() {
+            if let Ok(mut child) = Command::new("wtype")
+                .args(["-M", "ctrl", "-k", "v", "-m", "ctrl"])
+                .spawn()
+            {
+                if child.wait().map(|s| s.success()).unwrap_or(false) {
+                    tracing::debug!("Paste via wtype (Wayland)");
+                    return Ok(());
+                }
+            }
+        }
+
+        // 2. Lumen Native Injector (fallback robusto via uinput)
         let injector_script = "tools/injector.py";
         if std::path::Path::new(injector_script).exists() {
             if let Ok(mut child) = Command::new("python3")
@@ -189,7 +211,7 @@ impl TextInjector {
             }
         }
 
-        // 2. ydotool (Se instalado)
+        // 3. ydotool (Se instalado)
         if which::which("ydotool").is_ok() {
             let socket = std::env::var("YDOTOOL_SOCKET").unwrap_or_else(|_| "/tmp/ydotoolsock".to_string());
             if let Ok(mut child) = Command::new("ydotool")
@@ -199,19 +221,6 @@ impl TextInjector {
             {
                 if child.wait().map(|s| s.success()).unwrap_or(false) {
                     tracing::debug!("Paste via ydotool");
-                    return Ok(());
-                }
-            }
-        }
-
-        // 3. wtype (Wayland nativo — foca no protocolo do compositor)
-        if is_wayland && which::which("wtype").is_ok() {
-            if let Ok(mut child) = Command::new("wtype")
-                .args(["-M", "ctrl", "-k", "v", "-m", "ctrl"])
-                .spawn()
-            {
-                if child.wait().map(|s| s.success()).unwrap_or(false) {
-                    tracing::debug!("Paste via wtype");
                     return Ok(());
                 }
             }
@@ -235,10 +244,18 @@ impl TextInjector {
     }
 
     fn simulate_type_text(&self, text: &str) -> Result<()> {
+        let is_wayland = std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland";
+
         // wtype (Wayland nativo)
-        if let Ok(status) = Command::new("wtype").arg(text).status() {
-            if status.success() {
-                return Ok(());
+        if is_wayland && which::which("wtype").is_ok() {
+            // ✅ Proteção: Tenta detectar se o protocolo é suportado
+            // Se o wtype falhar com 'Compositor does not support', ele retorna 1.
+            if let Ok(status) = Command::new("wtype").arg(text).status() {
+                if status.success() {
+                    return Ok(());
+                } else {
+                    tracing::warn!("wtype falhou (vkeyboard protocol missing na sua sessão), tentando fallback...");
+                }
             }
         }
 

@@ -126,9 +126,23 @@ impl TranscriptionPipeline {
             processed = snippets.process(&processed);
         }
 
+        // ── FASE 2: Injeção Imediata (Antes da atualização visual para proteger o foco) ──
         let strategy = self.determine_strategy(&command).await;
+        let fast_text = processed.clone();
+        let cmd = command.clone();
+        let rid = uuid::Uuid::new_v4().to_string();
+        let raw_for_bg = raw_text.clone();
+
+        // ✅ Buffer de segurança para garantir que eventos físicos (Enter) terminaram
+        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
         let word_count = processed.split_whitespace().count() as u64;
         let processing_time_ms = start.elapsed().as_millis() as u64;
+        let ai_used = matches!(strategy, InjectionStrategy::DeferredAfterAi);
+
+        if processing_time_ms > 15000 {
+            tracing::warn!("⚠️ Transcrição lenta ({}s). Se estiver sem GPU, considere mudar o model_path para 'small' ou 'base' no config.yaml para resposta instantânea.", processing_time_ms / 1000);
+        }
 
         // Atualizar estatísticas síncronamente
         {
@@ -136,38 +150,35 @@ impl TranscriptionPipeline {
             session.record_transcription(word_count);
         }
 
-        // Emite evento de overlay informando o final do Whisper
+        if let InjectionStrategy::Immediate = strategy {
+            if !fast_text.trim().is_empty() {
+                let injector = self.text_injector.read().await;
+                if let Err(e) = injector.inject(&fast_text).await {
+                    tracing::error!("Falha ao injetar texto imediato: {}", e);
+                } else {
+                    self.state.emit(LumenEvent::InjectionComplete { text: fast_text.clone() });
+                }
+            }
+        }
+
+        // Emite evento de overlay informando o final do Whisper (Agora APÓS a injeção imediata)
         self.state.emit(LumenEvent::TranscriptionComplete {
-            id: uuid::Uuid::new_v4().to_string(),
-            raw: raw_text.clone(),
-            processed: processed.clone(),
-            words: word_count,
+            id: rid.clone(),
+            raw_text: raw_text.clone(),
+            processed_text: processed.clone(),
+            word_count,
             processing_time_ms,
+            ai_used,
             auto_sent: false,
         });
 
-        // ── FASE 2: Injeção ou IA Assíncrona ──
+        // ── FASE 3: IA Assíncrona ou Background Tasks ──
         let state_clone = Arc::clone(&self.state);
         let injector_clone = Arc::clone(&self.text_injector);
         let db_clone = Arc::clone(&self.analytics_db);
-        let fast_text = processed.clone();
-        let cmd = command.clone();
-        let rid = uuid::Uuid::new_v4().to_string();
-        let raw_for_bg = raw_text.clone();
-
+        
         match strategy {
             InjectionStrategy::Immediate => {
-                // Se for comando Send isolado (sem texto), não tenta injeção de string vazia.
-                if !fast_text.trim().is_empty() {
-                    let injector = injector_clone.read().await;
-                    if let Err(e) = injector.inject(&fast_text).await {
-                        tracing::error!("Falha ao injetar texto imediato: {}", e);
-                    } else {
-                        state_clone.emit(LumenEvent::InjectionComplete { text: fast_text.clone() });
-                    }
-                }
-
-                // Dispara Background apenas para banco e auto-sender
                 tokio::spawn(async move {
                     Self::handle_auto_send(&cmd, fast_text.clone(), state_clone.clone(), injector_clone).await;
                     Self::save_history(rid, raw_for_bg, fast_text, word_count, processing_time_ms, false, false, db_clone).await;
@@ -177,7 +188,6 @@ impl TranscriptionPipeline {
                 // Notificar overlay que estamos reescrevendo com IA
                 state_clone.emit(LumenEvent::AiProcessing);
                 
-                // Libera a thread principal, processa IA em background
                 tokio::spawn(async move {
                     let mut final_text = fast_text.clone();
                     let mut ai_used = false;
@@ -193,7 +203,6 @@ impl TranscriptionPipeline {
                         _ => None,
                     };
 
-                    // Implementação de Timeout Anti-Zombie + Fallback Obrigatório
                     let format_future = state_clone.ai_formatter.format_text(&fast_text, instruction_opt);
                     
                     match tokio::time::timeout(tokio::time::Duration::from_secs(15), format_future).await {
@@ -216,7 +225,7 @@ impl TranscriptionPipeline {
                         } else {
                             state_clone.emit(LumenEvent::InjectionComplete { text: final_text.clone() });
                         }
-                    } // Trava do injector liberada aqui
+                    }
 
                     Self::handle_auto_send(&cmd, final_text.clone(), state_clone.clone(), injector_clone).await;
                     Self::save_history(rid, raw_for_bg, final_text, word_count, processing_time_ms, ai_used, false, db_clone).await;

@@ -16,6 +16,7 @@ whisper-rs = "0.16"
 
 # Captura de áudio
 cpal = "0.17"
+nnnoiseless = "0.5"
 
 # Web server + API
 axum = { version = "0.8", features = ["ws"] }

@@ -57,7 +57,7 @@ export function DashboardTab({ status, rms, lastTranscription }: DashboardTabPro
             
             <Card className="bg-card/50 backdrop-blur border-border overflow-hidden group">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Transcriptions</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Transcrições</CardTitle>
                 <FileText className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
             </CardHeader>
             <CardContent>
@@ -67,7 +67,7 @@ export function DashboardTab({ status, rms, lastTranscription }: DashboardTabPro
 
             <Card className="bg-card/50 backdrop-blur border-border overflow-hidden group">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Words Flowing</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Palavras Fluindo</CardTitle>
                 <LayoutDashboard className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
             </CardHeader>
             <CardContent>

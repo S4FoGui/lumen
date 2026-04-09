@@ -52,7 +52,9 @@
 - [x] Renderização reativa de áudio: barras de volume pulsam com a fala
 - [x] Sincronização de RMS em tempo real via WebSocket para o Dashboard
 
-### ⌨️ Injeção Estabilizada (v1.0.6 - KDE Wayland Fix)
-- [x] Refinar `tools/injector.py` com delays de segurança para KDE 6
-- [x] Aumentar sincronização de clipboard para 600ms em `src/text/injector.rs`
-- [/] Limpeza de emergência do `/tmp` (Resolvendo conflito de escrita)
+### 🛡️ Supressão e Estabilidade (v1.0.9 - 1.2.1)
+- [x] Integração de RNNoise (nnnoiseless) para remoção de ruído via IA
+- [x] Física de Ondas Líquidas: Animação premium com volume suavizado (EMA)
+- [x] Lifecycle do Overlay: Auto-dismiss (5s) e consciência de estado (is_recording)
+- [x] Otimização Zero-Latency: Migração para modelo `base` e `lightning_mode`
+- [x] Eliminação total de warnings de compilação

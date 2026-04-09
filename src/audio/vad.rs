@@ -46,7 +46,7 @@ impl VoiceActivityDetector {
             speech_start_time: None,
             has_detected_voice: false,
             smoothed_rms: 0.0,
-            smoothing_factor: 0.15, // Levemente mais rápido que antes
+            smoothing_factor: 0.3, // Mais rápido para capturar picos no visualizador
             noise_floor: silence_threshold,
             noise_alpha: 0.05,       // ✅ Calibra mais rápido o ruído ambiente
             initial_threshold: silence_threshold,

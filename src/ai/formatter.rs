@@ -110,6 +110,17 @@ struct GeminiResponsePart {
     text: String,
 }
 
+#[derive(Deserialize)]
+struct GroqErrorResponse {
+    error: GroqErrorDetail,
+}
+
+#[derive(Deserialize)]
+struct GroqErrorDetail {
+    message: String,
+    code: Option<String>,
+}
+
 impl AiFormatter {
     /// Cria um novo formatador de IA.
     pub fn new(
@@ -233,6 +244,17 @@ impl AiFormatter {
         let text = response.text().await.context("Falha ao ler resposta Groq")?;
         tracing::debug!(response = %text, "Resposta bruta do Groq");
         
+        // Tentar parsear erro primeiro se não for sucesso ou se contiver erro no JSON
+        if text.contains("\"error\"") {
+            if let Ok(err_body) = serde_json::from_str::<GroqErrorResponse>(&text) {
+                let msg = err_body.error.message;
+                if err_body.error.code.as_deref() == Some("rate_limit_exceeded") {
+                    return Err(anyhow::anyhow!("Groq Rate Limit atingido. Tente em alguns minutos. Detalhe: {}", msg));
+                }
+                return Err(anyhow::anyhow!("Erro da API Groq: {}", msg));
+            }
+        }
+
         let body: OpenAiResponse = serde_json::from_str(&text)
             .map_err(|e| {
                 tracing::error!("Erro de parsing no Groq. Resposta recebida: {}", text);

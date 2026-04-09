@@ -7,7 +7,8 @@ type WaveformProps = {
 
 export function WaveformVisualizer({ rms, isRecording }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const barsRef = useRef<number[]>(Array(32).fill(0)); // 32 barras de espectro simulado
+  const phaseRef = useRef(0);
+  const smoothedRmsRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -21,51 +22,75 @@ export function WaveformVisualizer({ rms, isRecording }: WaveformProps) {
       // Limpar canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const targetGain = isRecording ? Math.min(rms * 15, 1.0) : 0;
+      // Suavizar a entrada de RMS para evitar saltos bruscos na animação
+      smoothedRmsRef.current += (rms - smoothedRmsRef.current) * 0.2;
       
       const width = canvas.width;
       const height = canvas.height;
-      const barCount = barsRef.current.length;
-      const barWidth = (width / barCount) * 0.6;
-      const gap = (width / barCount) * 0.4;
-      
       const centerY = height / 2;
+      
+      // Ganho dinâmico: mais sensível para pequenos volumes
+      const activityLevel = isRecording ? Math.min(smoothedRmsRef.current * 12, 1.2) : 0;
+      
+      // Incrementar fase para movimento contínuo
+      phaseRef.current += 0.05 + activityLevel * 0.1;
 
-      // Desenhar cada barra
-      for (let i = 0; i < barCount; i++) {
-        // Gerar variação "aleatória" baseada na posição para simular frequência
-        // As barras do meio tendem a ser mais altas (curva de sino)
-        const normalizePosition = (i / barCount) * Math.PI;
-        const bellCurve = Math.sin(normalizePosition); 
-        
-        const noise = Math.random() * 0.3 + 0.7; // 0.7 a 1.0 variação
-        
-        // Suavização (easing) para o alvo
-        const targetHeight = targetGain * bellCurve * noise * (height - 10);
-        
-        // Mover o valor atual suavemente em direção ao valor alvo (lerp)
-        barsRef.current[i] += (targetHeight - barsRef.current[i]) * 0.2;
-        
-        // Se isRecording for false e targetGain for 0, as barras retornam pro meio lentamente.
-        const barHeight = Math.max(barsRef.current[i], 2); // Altura min de 2px
-        
-        const x = i * (barWidth + gap);
-        const y = centerY - barHeight / 2;
-
-        // Cor Neon Lime (accent)
-        ctx.fillStyle = isRecording ? 'rgba(163, 230, 53, 0.9)' : 'rgba(163, 230, 53, 0.2)';
-        
-        // Glow effect
-        ctx.shadowBlur = isRecording ? 10 : 0;
-        ctx.shadowColor = 'rgba(163, 230, 53, 0.5)';
-        
-        // Desenhar a barra com borda arredondada (simulado via dois arcos e um ret)
+      // Desenhar 3 camadas de ondas
+      const drawWave = (
+        opacity: number, 
+        amplitudeMult: number, 
+        freqMult: number, 
+        phaseOffset: number,
+        lineWidth: number
+      ) => {
         ctx.beginPath();
-        ctx.roundRect(x, y, barWidth, barHeight, 4);
-        ctx.fill();
-        
-        // Reset shadow
-        ctx.shadowBlur = 0;
+        ctx.strokeStyle = `rgba(163, 230, 53, ${opacity})`;
+        ctx.lineWidth = lineWidth;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        // Efeito de Glow sutil
+        if (isRecording) {
+            ctx.shadowBlur = 15 * activityLevel;
+            ctx.shadowColor = 'rgba(163, 230, 53, 0.4)';
+        }
+
+        for (let x = 0; x <= width; x += 2) {
+          // Curva de sino para manter as pontas finas e o meio volumoso
+          const normalizePosition = x / width;
+          const bellCurve = Math.sin(normalizePosition * Math.PI);
+          
+          // Equação da onda: sen(x * freq + fase)
+          // Adicionamos variação baseada no activityLevel
+          const wave = Math.sin(normalizePosition * Math.PI * 2 * freqMult + phaseRef.current + phaseOffset);
+          
+          // Amplitude depende do volume e da posição (bell curve)
+          const amplitude = (height * 0.4) * activityLevel * amplitudeMult * bellCurve;
+          
+          const y = centerY + wave * amplitude;
+
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0; // Reset shadow
+      };
+
+      if (isRecording) {
+        // Camada 3 (Fundo, lenta, larga)
+        drawWave(0.15, 0.6, 0.8, phaseRef.current * 0.5, 2);
+        // Camada 2 (Meio, média)
+        drawWave(0.3, 0.8, 1.2, -phaseRef.current * 0.3, 3);
+        // Camada 1 (Frente, rápida, detalhada)
+        drawWave(0.9, 1.0, 1.5, phaseRef.current, 4);
+      } else {
+        // Linha base estática pulsante sutil
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(163, 230, 53, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.stroke();
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -86,7 +111,7 @@ export function WaveformVisualizer({ rms, isRecording }: WaveformProps) {
       )}
       <canvas 
         ref={canvasRef} 
-        width={300} 
+        width={400} 
         height={64} 
         className="w-full h-full max-w-sm"
       />

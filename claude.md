@@ -1,44 +1,24 @@
-# 📜 Project Constitution (claude.md)
+# Project Constitution: Lumen - Audio Waveform Synchronization
 
-## 1. Identity
-- **System Pilot:** AI assistant for building deterministic, self-healing automation.
-- **Protocol:** B.L.A.S.T. (Blueprint, Link, Architect, Stylize, Trigger).
-- **Architecture:** A.N.T. 3-layer system.
+## Data Schemas
 
-## 2. Core Constraints
-- **Data-First:** JSON Data Schema (Input/Output) defines logic.
-- **Reliability > Speed:** Never guess business logic.
-- **Self-Annealing:** Repair loops for failed tools.
-
-## 3. Project Specific Rules
-- Use `npx -y` for new project creation.
-- Vanilla CSS/Javascript for web components.
-- GTK4 / Layer-Shell for the Rust backend (Lumen).
-
-## 4. MCP Server Management
-- **Shadcn/UI MCP:** `npx -y shadcn mcp`.
-- **Token Saver MCP:** Ferramentas customizadas para economia de tokens:
-    - `summarize_file`: Assinaturas e imports (economia de ~70%).
-    - `extract_relevant_code`: Busca semântica e contextual.
-    - `list_project_structure`: Árvore recursiva compacta.
-    - `diff_summary`: Resumo estatístico de mudanças.
-    - `count_tokens_estimate`: Heurística para planejamento de contexto.
-
-## 5. File Structure Reference
+### Audio Level Payload
+```json
+{
+  "type": "audio_level",
+  "data": {
+    "peak": 0.5,
+    "rms": 0.2
+  }
+}
 ```
-/lumen/
-├── architecture/      # Layer 1: Technical SOPs and Architecture Docs
-├── assets/            # Project assets (icons, images)
-├── docs/              # Layer 1: General documentation and user guides
-├── models/            # AI Models (Whisper, etc.)
-├── scripts/           # Installation and maintenance scripts
-├── src/               # Layer 2 & 3: Rust source code (A.N.T. layers 2 and 3)
-├── tests/             # Integration tests and debug tools
-│   └── scripts/       # Standalone test/debug scripts
-├── tools/             # Layer 3: Utility tools and shell scripts
-├── claude.md          # Project Map & State Tracking
-├── gemini.md          # Project Constitution & Data Schemas
-├── findings.md        # Research and Discoveries
-├── progress.md        # Task Progress Tracking
-└── task_plan.md       # Development Roadmap
-```
+
+## Behavioral Rules
+- **Offline First**: All audio processing must happen locally.
+- **Privacy**: No audio data should leave the local system unless explicitly requested.
+- **Latency**: Audio-to-visual latency must be minimized for a responsive feel.
+
+## Architectural Invariants
+- Backend (Rust) handles raw audio capture and calculation of levels.
+- Frontend (React/Vite) receives levels via WebSocket and animates the Waveform component.
+- The 3-layer architecture (Architecture, Navigation, Tools) must be respected for automation tasks.

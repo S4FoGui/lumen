@@ -119,6 +119,7 @@ async fn main() -> Result<()> {
         audio::capture::AudioCapture::new(
             config.audio.device.clone(),
             config.audio.sample_rate,
+            config.audio.noise_suppression,
         )
     ));
 
@@ -348,8 +349,8 @@ async fn main() -> Result<()> {
                         let wake_word_c = wake_word.clone();
 
                         tokio::spawn(async move {
-                            tracing::info!("🎧 Always Listening: aguardando 4s para reativar...");
-                            tokio::time::sleep(tokio::time::Duration::from_secs(4)).await;
+                            tracing::info!("🎧 Always Listening: aguardando 0.5s para reativar...");
+                            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                             
                             // Verificar se o modo ainda está ativo após o sono
                             let config = lumen_state_c.config.read().await;
@@ -485,7 +486,7 @@ async fn handle_toggle_recording(
 
         tokio::spawn(async move {
             let overlay_sender = overlay_sender.clone(); // Clone do Sender<OverlayMessage>
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(100));
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(30));
             let mut last_len = 0usize;
 
             loop {

@@ -97,7 +97,7 @@ export function useLumenSocket() {
             setStatus(prev => ({
               ...prev,
               total_transcriptions: prev.total_transcriptions + 1,
-              total_words: prev.total_words + payload.data.word_count
+              total_words: prev.total_words + (payload.data.word_count || 0)
             }));
             break;
 

@@ -50,7 +50,11 @@ impl Overlay {
                 let mut anim_tick_id: Option<gtk4::TickCallbackId> = None;
 
                 let phase = Arc::new(std::sync::atomic::AtomicU64::new(0));
-                let volume = Arc::new(std::sync::atomic::AtomicU32::new(0)); // f32 como u32 bits
+                let volume = Arc::new(std::sync::atomic::AtomicU32::new(0)); 
+                let smoothed_volume = Arc::new(std::sync::atomic::AtomicU32::new(0));
+                let target_opacity = Arc::new(std::sync::atomic::AtomicU32::new(0)); 
+                let is_recording_state = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                let last_activity = Arc::new(std::sync::atomic::AtomicU64::new(glib::monotonic_time() as u64));
 
                 // Registrar draw func antes do async move
                 let phase_draw = Arc::clone(&phase);
@@ -61,37 +65,50 @@ impl Overlay {
                     let t = f64::from_bits(phase_draw.load(std::sync::atomic::Ordering::Relaxed));
                     let vol = f32::from_bits(volume_draw.load(std::sync::atomic::Ordering::Relaxed));
 
-                    // Normalizar volume (RMS costuma ser baixo, ex: 0.01-0.2)
-                    let vol_boost = (vol * 15.0).clamp(0.0, 1.5) as f64;
-
-                    let bar_count = 12i32;
-                    let bar_w = 3.0f64;
-                    let gap = 3.0f64;
-                    let total_w = bar_count as f64 * (bar_w + gap) - gap;
-                    let start_x = (width as f64 - total_w) / 2.0;
                     let center_y = height as f64 / 2.0;
-                    let max_h = height as f64 * 0.8;
+                    let w = width as f64;
 
-                    for i in 0..bar_count {
-                        let norm = i as f64 / bar_count as f64;
-                        let bell = (std::f64::consts::PI * norm).sin();
-                        let wave = (t * 6.0 + norm * std::f64::consts::TAU * 1.5).sin() * 0.5 + 0.5;
+                    // Ganho dinâmico baseado no volume suavizado
+                    let activity = (vol * 15.0).min(1.5) as f64;
+
+                    let draw_layer = |opacity: f64, freq_mult: f64, speed_mult: f64, phase_off: f64| {
+                        cr.set_source_rgba(0.2, 1.0, 0.4, opacity);
+                        cr.move_to(0.0, height as f64);
+
+                        let activity_level = activity.max(0.005);
+                        let phase = t;
                         
-                        // Altura reativa: base mínima de 3px + pulso do volume
-                        let h = (bell * (0.2 + vol_boost) * wave * max_h).max(3.0);
+                        let amp_base = height as f64 * 0.3 * activity_level;
+                        let p = phase * speed_mult + phase_off;
 
-                        let x = start_x + i as f64 * (bar_w + gap);
-                        let y = center_y - h / 2.0;
+                        // Passo mais fino (1px) e inclusivo (<= width) para suavidade máxima
+                        for x in 0..=width {
+                            let x_f = x as f64;
+                            let norm_x = x_f / width as f64 * std::f64::consts::PI * 2.0 * freq_mult;
+                            
+                            let y1 = (norm_x + p).sin();
+                            let y2 = (norm_x * 1.6 - p * 1.3).cos() * 0.45;
+                            let y3 = (norm_x * 2.5 + p * 0.8).sin() * 0.25;
+                            
+                            let y_offset = (y1 + y2 + y3) * amp_base;
+                            cr.line_to(x_f, center_y + y_offset);
+                        }
 
-                        let alpha = 0.5 + wave * 0.5;
-
-                        cr.set_source_rgba(163.0 / 255.0, 230.0 / 255.0, 53.0 / 255.0, alpha * 0.3);
-                        cr.rectangle(x - 1.0, y - 1.0, bar_w + 2.0, h + 2.0);
+                        cr.line_to(width as f64, height as f64);
+                        cr.close_path();
                         let _ = cr.fill();
+                    };
 
-                        cr.set_source_rgba(163.0 / 255.0, 230.0 / 255.0, 53.0 / 255.0, alpha);
-                        cr.rectangle(x, y, bar_w, h);
-                        let _ = cr.fill();
+                    if activity > 0.02 {
+                        draw_layer(0.12, 0.9, 1.1, 0.0);
+                        draw_layer(0.22, 1.4, 0.9, 2.3);
+                        draw_layer(0.45, 0.8, 1.4, 4.7);
+                    } else {
+                        cr.set_source_rgba(0.64, 0.9, 0.2, 0.3);
+                        cr.set_line_width(1.5);
+                        cr.move_to(0.0, center_y);
+                        cr.line_to(w, center_y);
+                        let _ = cr.stroke();
                     }
                 });
 
@@ -100,14 +117,58 @@ impl Overlay {
                         match msg {
                             OverlayMessage::ShowRecording => {
                                 label.set_text("Ouvindo...");
-                                window.set_visible(true);
+                                is_recording_state.store(true, std::sync::atomic::Ordering::Relaxed);
+                                target_opacity.store(1.0f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
+                                last_activity.store(glib::monotonic_time() as u64, std::sync::atomic::Ordering::Relaxed);
+                                
+                                // Reset manual imediato para gatilho visual se estiver invisível
+                                if window.opacity() < 0.01 {
+                                    window.set_opacity(0.05);
+                                }
 
                                 if anim_tick_id.is_none() {
                                     let da = drawing_area.clone();
-                                    let phase_clone = Arc::clone(&phase);
+                                    let win = window.clone();
+                                    
+                                    // Clones para o ticker
+                                    let phase_tick = Arc::clone(&phase);
+                                    let vol_raw = Arc::clone(&volume);
+                                    let vol_smooth = Arc::clone(&smoothed_volume);
+                                    let opacity_target = Arc::clone(&target_opacity);
+                                    let rec_state = Arc::clone(&is_recording_state);
+                                    let activity_log = Arc::clone(&last_activity);
+
                                     let tick_id = drawing_area.add_tick_callback(move |_widget, clock| {
+                                        let now_us = glib::monotonic_time() as u64;
                                         let t = clock.frame_time() as f64 / 1_000_000.0;
-                                        phase_clone.store(t.to_bits(), std::sync::atomic::Ordering::Relaxed);
+                                        phase_tick.store(t.to_bits(), std::sync::atomic::Ordering::Relaxed);
+
+                                        // 1. Suavizar Volume (EMA)
+                                        let target_v = f32::from_bits(vol_raw.load(std::sync::atomic::Ordering::Relaxed));
+                                        let current_v = f32::from_bits(vol_smooth.load(std::sync::atomic::Ordering::Relaxed));
+                                        let next_v = current_v * 0.85 + target_v * 0.15;
+                                        vol_smooth.store(next_v.to_bits(), std::sync::atomic::Ordering::Relaxed);
+
+                                        // 2. Auto-Dismiss Logic (5 segundos)
+                                        // ✅ SÓ esmaece se NÃO estiver gravando
+                                        let recording = rec_state.load(std::sync::atomic::Ordering::Relaxed);
+                                        let last = activity_log.load(std::sync::atomic::Ordering::Relaxed);
+                                        if !recording && (now_us - last > 5_000_000) {
+                                            opacity_target.store(0.0f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
+                                        }
+
+                                        // 3. Smooth Opacity Transition
+                                        let target_o = f32::from_bits(opacity_target.load(std::sync::atomic::Ordering::Relaxed)) as f64;
+                                        let current_o = win.opacity();
+                                        if (current_o - target_o).abs() > 0.01 {
+                                            let next_o = if current_o < target_o {
+                                                (current_o + 0.08).min(target_o)
+                                            } else {
+                                                (current_o - 0.05).max(target_o)
+                                            };
+                                            win.set_opacity(next_o);
+                                        }
+
                                         da.queue_draw();
                                         glib::ControlFlow::Continue
                                     });
@@ -115,10 +176,10 @@ impl Overlay {
                                 }
                             }
                             OverlayMessage::HideRecording => {
-                                window.set_visible(false);
-                                if let Some(tick) = anim_tick_id.take() {
-                                    tick.remove();
-                                }
+                                is_recording_state.store(false, std::sync::atomic::Ordering::Relaxed);
+                                // A pílula SÓ some se não houver atividade por 5s ou se explicitamente escondida
+                                // Mas aqui vamos manter o target_opacity em 0.0 para iniciar o fade se o usuário parou
+                                target_opacity.store(0.0f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
                             }
                             OverlayMessage::UpdateTranscription(text) => {
                                 let preview = if text.chars().count() > 55 {
@@ -127,27 +188,18 @@ impl Overlay {
                                     text.clone()
                                 };
                                 label.set_text(&preview);
-                                window.set_visible(true);
-
-                                if anim_tick_id.is_none() {
-                                    let da = drawing_area.clone();
-                                    let phase_clone = Arc::clone(&phase);
-                                    let tick_id = drawing_area.add_tick_callback(move |_widget, clock| {
-                                        let t = clock.frame_time() as f64 / 1_000_000.0;
-                                        phase_clone.store(t.to_bits(), std::sync::atomic::Ordering::Relaxed);
-                                        da.queue_draw();
-                                        glib::ControlFlow::Continue
-                                    });
-                                    anim_tick_id = Some(tick_id);
-                                }
+                                is_recording_state.store(false, std::sync::atomic::Ordering::Relaxed);
+                                target_opacity.store(1.0f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
+                                last_activity.store(glib::monotonic_time() as u64, std::sync::atomic::Ordering::Relaxed);
                             }
                             OverlayMessage::SetVolume(v) => {
                                 volume.store(v.to_bits(), std::sync::atomic::Ordering::Relaxed);
-                                drawing_area.queue_draw();
+                                if v > 0.02 {
+                                    last_activity.store(glib::monotonic_time() as u64, std::sync::atomic::Ordering::Relaxed);
+                                }
                             }
                             OverlayMessage::Shutdown => {
                                 window.close();
-                                // Forçar saída do loop GTK
                                 app_ref.quit();
                                 break;
                             }
@@ -209,7 +261,12 @@ fn build_pill_window(app: &gtk4::Application) -> gtk4::Window {
         .application(app)
         .decorated(false)
         .resizable(false)
+        .focusable(false)
+        .focus_on_click(false)
         .build();
+
+    window.set_opacity(0.0);
+    window.set_visible(true);
 
     #[cfg(feature = "wayland-overlay")]
     {
@@ -236,16 +293,20 @@ fn build_pill_window(app: &gtk4::Application) -> gtk4::Window {
     container.add_css_class("pill-container");
     container.set_halign(gtk4::Align::Center);
     container.set_valign(gtk4::Align::Center);
+    container.set_can_target(false);
 
     let drawing_area = gtk4::DrawingArea::new();
     drawing_area.set_size_request(72, 32);
+    drawing_area.set_can_target(false);
     container.append(&drawing_area);
 
     let label = gtk4::Label::new(Some("Ouvindo..."));
     label.add_css_class("transcription-label");
+    label.set_can_target(false);
     container.append(&label);
 
     window.set_child(Some(&container));
+    window.set_can_target(false);
     window
 }
 
