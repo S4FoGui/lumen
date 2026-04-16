@@ -96,37 +96,44 @@ impl TextInjector {
     }
 
     pub async fn inject(&self, text: &str) -> Result<()> {
+        self.inject_with_refocus(text, None).await
+    }
+
+    /// Injeta texto na janela alvo, opcionalmente refocando-a antes de colar.
+    /// `target_window_id`: ID da janela X11/XWayland que deve receber o texto.
+    /// Se fornecido, o injetor refoca essa janela antes de simular Ctrl+V.
+    pub async fn inject_with_refocus(&self, text: &str, target_window_id: Option<&str>) -> Result<()> {
         if text.is_empty() {
             return Ok(());
         }
 
         tracing::info!("📝 Injetando texto ({} caracteres): \"{}\"", text.len(), text);
-        // ✅ Delay antes de injetar (deixa tempo para o foco voltar à janela alvo)
-        std::thread::sleep(Duration::from_millis(self.delay_ms));
-
-        // ✅ Melhoria v1.0.5: No Wayland, se o texto for curto, prefere digitação direta
-        let is_wayland = std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland";
-        if is_wayland && text.len() < 60 {
-            if self.simulate_type_text(text).is_ok() {
-                tracing::info!("✅ Texto digitado diretamente com sucesso");
-                return Ok(());
-            }
-        }
-
+        
+        // ✅ FIX: Sempre usar o método configurado (clipboard paste).
+        // A "digitação direta" via xdotool/wtype NÃO funciona em janelas Wayland-nativas
+        // (ex: Brave, Firefox, terminais nativos). xdotool retorna exit 0 mas não digita nada.
+        // Clipboard paste (wl-copy + Ctrl+V) é o único método confiável no Wayland.
         match self.method {
             InjectionMethod::ClipboardPaste => {
-                // Copiar para clipboard e colar
+                // Copiar para clipboard ANTES de refocá-la (evita atraso)
                 self.copy_to_clipboard(text)?;
-                // Delay extra para o clipboard estar pronto e a janela focar
-                std::thread::sleep(Duration::from_millis(400));
+                
+                // ✅ Refocá-la ANTES de colar — o overlay pode ter roubado o foco
+                self.refocus_target_window(target_window_id);
+                
+                // Delay para o foco e clipboard estabilizarem
+                std::thread::sleep(Duration::from_millis(250));
                 self.simulate_paste()?;
             }
             _ => {
                 // Tentar digitar diretamente; fallback para clipboard
+                self.refocus_target_window(target_window_id);
+                std::thread::sleep(Duration::from_millis(150));
+                
                 if self.simulate_type_text(text).is_err() {
                     tracing::warn!("Digitação direta falhou, usando clipboard");
                     self.copy_to_clipboard(text)?;
-                    std::thread::sleep(Duration::from_millis(100));
+                    std::thread::sleep(Duration::from_millis(200));
                     self.simulate_paste()?;
                 }
             }
@@ -136,9 +143,47 @@ impl TextInjector {
         Ok(())
     }
 
+    /// Refoca a janela alvo do usuário antes de colar texto.
+    /// Necessário porque o overlay GTK pode roubar o foco durante a gravação.
+    fn refocus_target_window(&self, target_window_id: Option<&str>) {
+        if let Some(win_id) = target_window_id {
+            tracing::info!("🎯 Refocando janela alvo: {}", win_id);
+            
+            // xdotool windowactivate — funciona em X11 e XWayland
+            if let Ok(status) = Command::new("xdotool")
+                .args(["windowactivate", "--sync", win_id])
+                .status()
+            {
+                if status.success() {
+                    tracing::info!("✅ Janela alvo refocada com sucesso");
+                    // Delay extra para o WM processar a mudança de foco
+                    std::thread::sleep(Duration::from_millis(150));
+                    return;
+                }
+            }
+            tracing::warn!("⚠️ Falha ao refocá-la janela alvo {}", win_id);
+        } else {
+            tracing::debug!("Nenhuma janela alvo salva — tentando colar na janela atual");
+        }
+    }
+
     fn copy_to_clipboard(&self, text: &str) -> Result<()> {
         tracing::debug!("📋 Copiando texto para clipboard...");
-        // 1) wl-copy (Wayland — mais confiável no KDE)
+        
+        // 1) arboard (Rust nativo — melhor persistência de clipboard no Wayland KDE)
+        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+            if clipboard.set_text(text.to_string()).is_ok() {
+                std::thread::sleep(Duration::from_millis(100));
+                tracing::info!("📋 Texto copiado via arboard nativo");
+                return Ok(());
+            } else {
+                tracing::warn!("arboard falhou ao definir texto");
+            }
+        } else {
+            tracing::warn!("Falha ao inicializar o arboard");
+        }
+
+        // 2) wl-copy (Wayland shell fallback)
         if let Ok(mut child) = Command::new("wl-copy")
             .stdin(std::process::Stdio::piped())
             .spawn()
@@ -148,16 +193,7 @@ impl TextInjector {
                 let _ = stdin.write_all(text.as_bytes());
             }
             if child.wait().map(|s| s.success()).unwrap_or(false) {
-                tracing::debug!("Texto copiado via wl-copy");
-                return Ok(());
-            }
-        }
-
-        // 2) arboard (Rust nativo — funciona X11 e Wayland via XWayland)
-        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-            if clipboard.set_text(text.to_string()).is_ok() {
-                std::thread::sleep(Duration::from_millis(100));
-                tracing::debug!("Texto copiado via arboard");
+                tracing::info!("📋 Texto copiado via wl-copy");
                 return Ok(());
             }
         }
@@ -173,7 +209,7 @@ impl TextInjector {
                 let _ = stdin.write_all(text.as_bytes());
             }
             let _ = child.wait();
-            tracing::debug!("Texto copiado via xclip");
+            tracing::info!("📋 Texto copiado via xclip");
         }
 
         Ok(())
@@ -182,36 +218,9 @@ impl TextInjector {
     fn simulate_paste(&self) -> Result<()> {
         let is_wayland = std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland";
         
-        tracing::debug!("⌨️ Simulando paste (Ctrl+V)...");
+        tracing::info!("⌨️ Simulando paste (Ctrl+V)...");
 
-        // 1. wtype (Wayland nativo — Mais confiável em protocolos modernos)
-        if is_wayland && which::which("wtype").is_ok() {
-            if let Ok(mut child) = Command::new("wtype")
-                .args(["-M", "ctrl", "-k", "v", "-m", "ctrl"])
-                .spawn()
-            {
-                if child.wait().map(|s| s.success()).unwrap_or(false) {
-                    tracing::debug!("Paste via wtype (Wayland)");
-                    return Ok(());
-                }
-            }
-        }
-
-        // 2. Lumen Native Injector (fallback robusto via uinput)
-        let injector_script = "tools/injector.py";
-        if std::path::Path::new(injector_script).exists() {
-            if let Ok(mut child) = Command::new("python3")
-                .args([injector_script, "paste"])
-                .spawn()
-            {
-                if child.wait().map(|s| s.success()).unwrap_or(false) {
-                    tracing::debug!("Paste via Lumen Native Injector (uinput)");
-                    return Ok(());
-                }
-            }
-        }
-
-        // 3. ydotool (Se instalado)
+        // 1. ydotool (Wayland-native, funciona sem virtual keyboard protocol)
         if which::which("ydotool").is_ok() {
             let socket = std::env::var("YDOTOOL_SOCKET").unwrap_or_else(|_| "/tmp/ydotoolsock".to_string());
             if let Ok(mut child) = Command::new("ydotool")
@@ -220,26 +229,59 @@ impl TextInjector {
                 .spawn()
             {
                 if child.wait().map(|s| s.success()).unwrap_or(false) {
-                    tracing::debug!("Paste via ydotool");
+                    tracing::info!("✅ Paste via ydotool");
                     return Ok(());
                 }
             }
+            tracing::debug!("ydotool falhou, tentando próximo método...");
         }
 
-        // 4. xdotool (X11 / Fallback XWayland)
-        if (!is_wayland || which::which("ydotool").is_err()) && which::which("xdotool").is_ok() {
+        // 2. Lumen Native Injector (uinput — funciona em qualquer sessão)
+        let script_paths = [".system/tools/injector.py", "tools/injector.py"];
+        for injector_script in script_paths {
+            if std::path::Path::new(injector_script).exists() {
+                if let Ok(mut child) = Command::new("python3")
+                    .args([injector_script, "paste"])
+                    .spawn()
+                {
+                    if child.wait().map(|s| s.success()).unwrap_or(false) {
+                        tracing::info!("✅ Paste via Lumen Native Injector (uinput) no caminho {}", injector_script);
+                        return Ok(());
+                    }
+                }
+                tracing::debug!("Lumen Native Injector falhou, tentando próximo método...");
+            }
+        }
+
+        // 3. wtype (Wayland — funciona apenas se o compositor suporta virtual keyboard)
+        if is_wayland && which::which("wtype").is_ok() {
+            if let Ok(mut child) = Command::new("wtype")
+                .args(["-M", "ctrl", "-k", "v", "-m", "ctrl"])
+                .spawn()
+            {
+                if child.wait().map(|s| s.success()).unwrap_or(false) {
+                    tracing::info!("✅ Paste via wtype (Wayland)");
+                    return Ok(());
+                }
+            }
+            tracing::debug!("wtype falhou, tentando próximo método...");
+        }
+
+        // 4. xdotool (X11 / XWayland — funciona na maioria das apps mesmo no Wayland)
+        if which::which("xdotool").is_ok() {
             if let Ok(status) = Command::new("xdotool")
                 .args(["key", "--clearmodifiers", "ctrl+v"])
                 .status()
             {
                 if status.success() {
-                    tracing::debug!("Paste via xdotool Ctrl+V");
+                    tracing::info!("✅ Paste via xdotool Ctrl+V");
                     return Ok(());
                 }
             }
+            tracing::debug!("xdotool falhou");
         }
 
-        tracing::warn!("Nenhum método de paste disponível ou funcional; texto está no clipboard (Ctrl+V manual)");
+        tracing::warn!("⚠️ Nenhum método de paste funcionou; texto está no clipboard — cole manualmente com Ctrl+V");
         Ok(())
     }
 
@@ -286,15 +328,20 @@ impl TextInjector {
         std::thread::sleep(Duration::from_millis(300));
 
         // 1. Lumen Native Injector (uinput)
-        let injector_script = "tools/injector.py";
-        if std::path::Path::new(injector_script).exists() {
-            if let Ok(mut child) = Command::new("python3")
-                .args([injector_script, "enter"])
-                .spawn()
-            {
-                if child.wait().map(|s| s.success()).unwrap_or(false) {
-                    tracing::debug!("Enter via Lumen Native Injector (uinput)");
-                    return Ok(());
+        let script_paths = [".system/tools/injector.py", "tools/injector.py"];
+        for injector_script in script_paths {
+            if std::path::Path::new(injector_script).exists() {
+                if let Ok(output) = Command::new("python3")
+                    .args([injector_script, "enter"])
+                    .output()
+                {
+                    if output.status.success() {
+                        tracing::info!("⏎ Enter via Lumen Native Injector (uinput) no caminho {}", injector_script);
+                        return Ok(());
+                    } else {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        tracing::warn!("Lumen Native Injector falhou para enter. stderr: {}", stderr);
+                    }
                 }
             }
         }
@@ -338,5 +385,52 @@ impl TextInjector {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test 2: Text Injector Method Detection
+    /// Validates that probe_injection_method returns a valid method
+    /// and that inject("") is a no-op.
+    #[tokio::test]
+    async fn test_probe_injection_method_returns_valid() {
+        let method = TextInjector::probe_injection_method().await;
+        // Must return one of the known variants
+        assert!(
+            matches!(
+                method,
+                InjectionMethod::X11
+                    | InjectionMethod::Wayland
+                    | InjectionMethod::KdeFakeInput
+                    | InjectionMethod::Uinput
+                    | InjectionMethod::Ydotool
+                    | InjectionMethod::ClipboardPaste
+            ),
+            "probe_injection_method returned unexpected variant: {:?}",
+            method
+        );
+    }
+
+    #[tokio::test]
+    async fn test_inject_empty_text_is_noop() {
+        let injector = TextInjector::new(Some("clipboard"), 50).await;
+        // Injecting empty text must succeed immediately without side effects
+        let result = injector.inject("").await;
+        assert!(result.is_ok(), "inject('') should be a no-op but returned error");
+    }
+
+    #[tokio::test]
+    async fn test_new_with_explicit_method() {
+        let injector = TextInjector::new(Some("x11"), 100).await;
+        assert_eq!(injector.method, InjectionMethod::X11);
+
+        let injector = TextInjector::new(Some("clipboard_paste"), 100).await;
+        assert_eq!(injector.method, InjectionMethod::ClipboardPaste);
+
+        let injector = TextInjector::new(Some("ydotool"), 100).await;
+        assert_eq!(injector.method, InjectionMethod::Ydotool);
     }
 }

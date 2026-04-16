@@ -100,4 +100,51 @@ mod tests {
             "Sim, claro"
         );
     }
+
+    /// Test 1: Transcription Pipeline Processing
+    /// Simulates the full filter chain: raw text → filler removal → clean output
+    /// Validates that TranscriptionRecord-like output has expected fields.
+    #[test]
+    fn test_pipeline_filler_filter_produces_clean_record() {
+        // Simulate configurable filler words (same as default.yaml)
+        let fillers: Vec<String> = vec![
+            "humm".into(), "ééé".into(), "ãhh".into(), "uhh".into(),
+            "hmm".into(), "uhm".into(), "eh".into(), "ah".into(),
+            "tipo assim".into(), "né".into(), "então".into(), "bom".into(),
+            "um".into(), "uh".into(),
+        ];
+        let filter = FillerFilter::new(&fillers);
+
+        // Case 1: Portuguese text with multiple fillers
+        let raw = "Eu humm quero tipo assim dizer que ééé isso é um teste né";
+        let processed = filter.filter(raw);
+        assert!(!processed.contains("humm"), "Filler 'humm' should be removed");
+        assert!(!processed.contains("tipo assim"), "Filler 'tipo assim' should be removed");
+        assert!(!processed.contains("ééé"), "Filler 'ééé' should be removed");
+        assert!(processed.contains("quero"), "Real words must be preserved");
+        assert!(processed.contains("dizer"), "Real words must be preserved");
+        assert!(processed.contains("teste"), "Real words must be preserved");
+
+        // Case 2: All fillers → result should be empty or whitespace-only
+        let raw_all_fillers = "humm ééé uhh hmm";
+        let processed_empty = filter.filter(raw_all_fillers);
+        assert!(processed_empty.trim().is_empty(), "All-filler text should produce empty output");
+
+        // Case 3: No fillers → text should pass through unchanged
+        let raw_clean = "Teste de transcrição limpa sem fillers";
+        let processed_clean = filter.filter(raw_clean);
+        assert_eq!(processed_clean, raw_clean, "Clean text should pass through unchanged");
+
+        // Case 4: Punctuation cleanup
+        let raw_punct = "Sim uhh , claro uhh . Muito bom";
+        let processed_punct = filter.filter(raw_punct);
+        assert!(processed_punct.contains("Sim,"), "Orphan comma should be cleaned");
+        assert!(processed_punct.contains("claro."), "Orphan period should be cleaned");
+
+        // Case 5: Validate simulated TranscriptionRecord fields
+        let word_count = processed.split_whitespace().count();
+        assert!(word_count > 0, "Word count must be > 0 for non-empty transcription");
+        assert!(word_count < raw.split_whitespace().count(), "Processed text should have fewer words than raw (fillers removed)");
+    }
 }
+

@@ -235,3 +235,78 @@ impl LumenConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test 3: Config Load and Validation
+    /// Loads default config, validates fields, and tests serialization roundtrip.
+
+    #[test]
+    fn test_default_config_loads_and_validates() {
+        // Parse the bundled default.yaml
+        let yaml_str = include_str!("../config/default.yaml");
+        let config: LumenConfig = serde_yaml::from_str(yaml_str)
+            .expect("Default config YAML should parse without errors");
+
+        // Validate all fields
+        assert!(config.validate().is_ok(), "Default config should pass validation");
+
+        // Check critical fields have expected defaults
+        assert_eq!(config.audio.sample_rate, 16000, "sample_rate must be 16000 for Whisper");
+        assert_eq!(config.audio.channels, 1, "channels must be 1 (mono)");
+        assert!(!config.transcription.language.is_empty(), "language must not be empty");
+        assert!(config.transcription.silence_threshold_ms >= 500, "silence_threshold_ms must be >= 500");
+        assert!(config.ui.dashboard_port > 0, "dashboard_port must be > 0");
+    }
+
+    #[test]
+    fn test_config_serialization_roundtrip() {
+        let yaml_str = include_str!("../config/default.yaml");
+        let config: LumenConfig = serde_yaml::from_str(yaml_str)
+            .expect("Failed to parse default config");
+
+        // Serialize back to YAML
+        let serialized = serde_yaml::to_string(&config)
+            .expect("Failed to serialize config to YAML");
+
+        // Parse again
+        let config2: LumenConfig = serde_yaml::from_str(&serialized)
+            .expect("Failed to re-parse serialized config");
+
+        // Compare key fields
+        assert_eq!(config.audio.sample_rate, config2.audio.sample_rate);
+        assert_eq!(config.audio.channels, config2.audio.channels);
+        assert_eq!(config.transcription.language, config2.transcription.language);
+        assert_eq!(config.transcription.silence_threshold_ms, config2.transcription.silence_threshold_ms);
+        assert_eq!(config.ui.dashboard_port, config2.ui.dashboard_port);
+        assert_eq!(config.hotkeys.toggle_recording, config2.hotkeys.toggle_recording);
+        assert_eq!(config.ai.provider, config2.ai.provider);
+    }
+
+    #[test]
+    fn test_config_validation_rejects_invalid() {
+        let yaml_str = include_str!("../config/default.yaml");
+        let mut config: LumenConfig = serde_yaml::from_str(yaml_str).unwrap();
+
+        // Invalid sample rate
+        config.audio.sample_rate = 44100;
+        assert!(config.validate().is_err(), "Should reject sample_rate != 16000");
+        config.audio.sample_rate = 16000;
+
+        // Invalid channels
+        config.audio.channels = 2;
+        assert!(config.validate().is_err(), "Should reject channels != 1");
+        config.audio.channels = 1;
+
+        // Invalid silence threshold
+        config.transcription.silence_threshold_ms = 100;
+        assert!(config.validate().is_err(), "Should reject silence_threshold_ms < 500");
+        config.transcription.silence_threshold_ms = 1200;
+
+        // Invalid dashboard port
+        config.ui.dashboard_port = 0;
+        assert!(config.validate().is_err(), "Should reject dashboard_port == 0");
+    }
+}

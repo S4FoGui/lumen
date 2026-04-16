@@ -1,0 +1,3 @@
+- **Fixed:** Lumen GUI "Ouvindo" overlay was stealing window focus and the Wayland shortcuts/Clipboard scripts were using wrong paths or bad fallbacks.
+- **Improved:** Removed UpdateTranscription from GTK so the overlay closes cleanly. Refocused origin window via xdotool windowactivate.
+- **Improved:** Mapped injector to correct `.system/tools/injector.py` to use `uinput` kernel module instead of xdotool for native pasting under KDE Wayland. Prioritized `arboard` in Rust for clipboard over `wl-copy`.

@@ -392,6 +392,29 @@ async fn handle_toggle_recording(
         ).await;
     } else {
         // ── Iniciar gravação ──
+        
+        // ✅ ANTES de mostrar o overlay: capturar a janela focada do usuário
+        // Isso é necessário porque o overlay pode roubar o foco,
+        // e precisamos refocá-la antes de colar o texto transcrito.
+        {
+            let window_id = std::process::Command::new("xdotool")
+                .arg("getactivewindow")
+                .output()
+                .ok()
+                .and_then(|o| if o.status.success() {
+                    String::from_utf8(o.stdout).ok().map(|s| s.trim().to_string())
+                } else {
+                    None
+                });
+            
+            if let Some(ref id) = window_id {
+                tracing::info!("🎯 Janela alvo capturada: {}", id);
+            } else {
+                tracing::debug!("Não foi possível capturar janela alvo (xdotool indisponível ou Wayland puro)");
+            }
+            *state.target_window_id.write().await = window_id;
+        }
+        
         *recording = true;
         *state.is_recording.write().await = true;
         state.emit(LumenEvent::RecordingStarted);
@@ -546,21 +569,10 @@ async fn handle_stop_and_process(
 
                         if !has_wake {
                             tracing::info!("🎧 Always Listening: wake word não detectada");
-                        } else {
                             tracing::info!("🎧 Always Listening: wake word detectada");
-                            if !record.processed_text.is_empty() {
-                                let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::UpdateTranscription(record.processed_text.clone()));
-                                tokio::time::sleep(tokio::time::Duration::from_secs(4)).await;
-                                let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::HideRecording);
-                            }
                         }
-                    } else if !record.processed_text.is_empty() {
-                        // Modo normal: também verificar texto vazio antes de enviar ao overlay
-                        let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::UpdateTranscription(record.processed_text.clone()));
-                        tokio::time::sleep(tokio::time::Duration::from_secs(4)).await;
-                        let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::HideRecording);
-                    } else {
-                        tracing::debug!("Modo normal: texto processado está vazio, não exibindo no overlay");
+                    } else if record.processed_text.is_empty() {
+                        tracing::debug!("Modo normal: texto processado está vazio");
                     }
                 }
                 Err(e) => {

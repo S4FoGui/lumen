@@ -168,7 +168,8 @@ impl TranscriptionPipeline {
         if let InjectionStrategy::Immediate = strategy {
             if !fast_text.trim().is_empty() {
                 let injector = self.text_injector.read().await;
-                if let Err(e) = injector.inject(&fast_text).await {
+                let target_win = self.state.target_window_id.read().await.clone();
+                if let Err(e) = injector.inject_with_refocus(&fast_text, target_win.as_deref()).await {
                     tracing::error!("Falha ao injetar texto imediato: {}", e);
                 } else {
                     self.state.emit(LumenEvent::InjectionComplete { text: fast_text.clone() });
@@ -235,7 +236,8 @@ impl TranscriptionPipeline {
 
                     {
                         let injector = injector_clone.read().await;
-                        if let Err(e) = injector.inject(&final_text).await {
+                        let target_win = state_clone.target_window_id.read().await.clone();
+                        if let Err(e) = injector.inject_with_refocus(&final_text, target_win.as_deref()).await {
                             tracing::error!("Falha ao injetar texto (Pós-IA): {}", e);
                         } else {
                             state_clone.emit(LumenEvent::InjectionComplete { text: final_text.clone() });

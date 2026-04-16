@@ -28,6 +28,11 @@ pub struct LumenState {
     pub is_recording: RwLock<bool>,
     pub session: RwLock<SessionStats>,
 
+    // ── Target window (janela que deve receber o texto colado) ──
+    /// Armazena o ID da janela focada antes de iniciar gravação.
+    /// Usado para refocá-la antes do Ctrl+V, evitando que o overlay roube o foco.
+    pub target_window_id: RwLock<Option<String>>,
+
     // ── Event Bus (broadcast → WebSocket, overlay, log) ──
     pub event_tx: broadcast::Sender<LumenEvent>,
 }
@@ -65,6 +70,7 @@ impl LumenState {
             db: db_instance,
             is_recording: RwLock::new(false),
             session: RwLock::new(SessionStats::new()),
+            target_window_id: RwLock::new(None),
             event_tx,
         })
     }
