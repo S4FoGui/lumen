@@ -127,6 +127,7 @@ impl Analytics {
                 processing_time_ms: row.get(5)?,
                 ai_used: row.get(6)?,
                 auto_sent: row.get(7)?,
+                is_wake_word_only: false,
             })
         })?;
 

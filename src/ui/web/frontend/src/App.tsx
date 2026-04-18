@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Mic, Activity, Settings, FileText, Book, BarChart3, HelpCircle, GraduationCap
+  Activity, Settings, BarChart3, HelpCircle, Sparkles
 } from 'lucide-react';
 
 import { useLumenSocket } from './hooks/useLumenSocket';
@@ -8,7 +8,7 @@ import { DashboardTab } from './components/tabs/DashboardTab';
 import { ConfigTab } from './components/tabs/ConfigTab';
 import { HistoryTab } from './components/tabs/HistoryTab';
 import { FaqTab } from './components/tabs/FaqTab';
-import { TrainingTab } from './components/tabs/TrainingTab';
+import { SnippetsTab } from './components/tabs/SnippetsTab';
 import { WaveformVisualizer } from './components/Waveform';
 
 export default function App() {
@@ -23,7 +23,7 @@ export default function App() {
       <aside className="w-64 border-r border-border bg-card shadow-2xl flex flex-col z-10">
         <div className="p-6 flex items-center gap-3 border-b border-border">
           <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-accent/20 border border-accent/50 shadow-[0_0_15px_rgba(163,230,53,0.3)]">
-            <Mic className={`w-5 h-5 ${status.is_recording ? 'text-red-500 animate-pulse' : 'text-accent'}`} />
+            <img src="/favicon.png" alt="Lumen" className={`w-full h-full rounded-full object-cover ${status.is_recording ? 'animate-pulse opacity-50' : ''}`} />
             {status.is_recording && (
                <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
             )}
@@ -41,10 +41,8 @@ export default function App() {
           {[
             { id: 'status', label: 'Ecosystem', icon: Activity },
             { id: 'config', label: 'Params', icon: Settings },
-            { id: 'training', label: 'Training', icon: GraduationCap },
             { id: 'history', label: 'Timeline', icon: BarChart3 },
-            { id: 'snippets', label: 'Snippets', icon: FileText },
-            { id: 'dictionary', label: 'Dictionary', icon: Book },
+            { id: 'snippets', label: 'Prompt Studio', icon: Sparkles },
             { id: 'faq', label: 'Guide', icon: HelpCircle }
           ].map((item) => (
             <button
@@ -100,19 +98,13 @@ export default function App() {
 
         {activeTab === 'config' && <ConfigTab />}
 
-        {activeTab === 'training' && <TrainingTab />}
+
 
         {activeTab === 'history' && <HistoryTab />}
 
         {activeTab === 'faq' && <FaqTab />}
 
-        {(activeTab === 'snippets' || activeTab === 'dictionary') && (
-          <div className="flex flex-col items-center justify-center h-full space-y-4 opacity-50 animate-in fade-in zoom-in-95 duration-500">
-            <Book className="w-16 h-16 text-muted-foreground" />
-            <h2 className="text-2xl font-semibold">Offline Datastore</h2>
-            <p className="text-muted-foreground">Em breve: Edição interativa.</p>
-          </div>
-        )}
+        {activeTab === 'snippets' && <SnippetsTab />}
       </main>
     </div>
   );

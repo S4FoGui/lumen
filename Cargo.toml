@@ -68,7 +68,7 @@ which = "6"
 cmake = "0.1"
 
 [features]
-default = []
+default = ["wayland-overlay"]
 wayland-overlay = ["gtk4-layer-shell"]
 
 [profile.release]

@@ -38,9 +38,9 @@ impl Overlay {
                     .expect("Falha ao inicializar container do overlay (Box)");
 
                 // Status dot (replaces the old DrawingArea waveform)
-                let status_dot: gtk4::Label = container
+                let status_dot: gtk4::Image = container
                     .first_child()
-                    .and_then(|c| c.downcast::<gtk4::Label>().ok())
+                    .and_then(|c| c.downcast::<gtk4::Image>().ok())
                     .expect("Falha ao inicializar status dot do overlay");
 
                 let label: gtk4::Label = container
@@ -54,73 +54,65 @@ impl Overlay {
                 let last_activity = Arc::new(std::sync::atomic::AtomicU64::new(glib::monotonic_time() as u64));
                 let is_visual_active = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-                // Tick callback for opacity animation (no waveform needed)
-                let mut anim_tick_id: Option<gtk4::TickCallbackId> = None;
+                // Instanciar callback de animação contínua (Roda todos os frames)
+                let win = window.clone();
+                let opacity_target = Arc::clone(&target_opacity);
+                let rec_state = Arc::clone(&is_recording_state);
+                let activity_log = Arc::clone(&last_activity);
+                let visual_active_tick = Arc::clone(&is_visual_active);
+
+                window.add_tick_callback(move |_widget, _clock| {
+                    let now_us = glib::monotonic_time() as u64;
+
+                    // Auto-Dismiss Logic
+                    let recording = rec_state.load(std::sync::atomic::Ordering::Relaxed);
+                    let last = activity_log.load(std::sync::atomic::Ordering::Relaxed);
+                    let is_visually_active = visual_active_tick.load(std::sync::atomic::Ordering::Relaxed);
+
+                    if !recording && !is_visually_active && (now_us - last > 3_000_000) {
+                        opacity_target.store(0.0f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
+                    }
+
+                    // Smooth Opacity Transition
+                    let target_o = f32::from_bits(opacity_target.load(std::sync::atomic::Ordering::Relaxed)) as f64;
+                    let current_o = win.opacity();
+                    if (current_o - target_o).abs() > 0.01 {
+                        let next_o = if current_o < target_o {
+                            (current_o + 0.15).min(target_o)
+                        } else {
+                            (current_o - 0.06).max(target_o)
+                        };
+                        win.set_opacity(next_o);
+                    }
+
+                    // Hide window completely when opacity reaches 0
+                    if current_o <= 0.01 && win.is_visible() {
+                        win.set_visible(false);
+                    }
+
+                    // Show window when needed (without present() to avoid focus steal)
+                    if target_o > 0.1 && !win.is_visible() {
+                        win.set_visible(true);
+                    }
+
+                    glib::ControlFlow::Continue
+                });
 
                 glib::spawn_future_local(async move {
                     while let Ok(msg) = receiver_clone.recv().await {
                         match msg {
                             OverlayMessage::ShowRecording => {
-                                status_dot.set_text("🟢");
+                                let home = std::env::var("HOME").unwrap_or_else(|_| "/home/gui".into());
+                                status_dot.set_from_file(Some(format!("{}/.local/share/lumen/lumen_circle.png", home).as_str()));
                                 label.set_text("Ouvindo...");
                                 is_recording_state.store(true, std::sync::atomic::Ordering::Relaxed);
                                 is_visual_active.store(true, std::sync::atomic::Ordering::Relaxed);
                                 target_opacity.store(1.0f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
                                 last_activity.store(glib::monotonic_time() as u64, std::sync::atomic::Ordering::Relaxed);
 
-                                // Show window WITHOUT stealing focus
                                 window.set_visible(true);
-                                // Do NOT call present() or surface.beep() — they can steal focus
-
-                                // Reset opacity if invisible
                                 if window.opacity() < 0.4 {
                                     window.set_opacity(0.4);
-                                }
-
-                                if anim_tick_id.is_none() {
-                                    let win = window.clone();
-                                    let opacity_target = Arc::clone(&target_opacity);
-                                    let rec_state = Arc::clone(&is_recording_state);
-                                    let activity_log = Arc::clone(&last_activity);
-                                    let visual_active_tick = Arc::clone(&is_visual_active);
-
-                                    let tick_id = window.add_tick_callback(move |_widget, _clock| {
-                                        let now_us = glib::monotonic_time() as u64;
-
-                                        // Auto-Dismiss Logic
-                                        let recording = rec_state.load(std::sync::atomic::Ordering::Relaxed);
-                                        let last = activity_log.load(std::sync::atomic::Ordering::Relaxed);
-                                        let is_visually_active = visual_active_tick.load(std::sync::atomic::Ordering::Relaxed);
-
-                                        if !recording && !is_visually_active && (now_us - last > 3_000_000) {
-                                            opacity_target.store(0.0f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
-                                        }
-
-                                        // Smooth Opacity Transition
-                                        let target_o = f32::from_bits(opacity_target.load(std::sync::atomic::Ordering::Relaxed)) as f64;
-                                        let current_o = win.opacity();
-                                        if (current_o - target_o).abs() > 0.01 {
-                                            let next_o = if current_o < target_o {
-                                                (current_o + 0.15).min(target_o)
-                                            } else {
-                                                (current_o - 0.06).max(target_o)
-                                            };
-                                            win.set_opacity(next_o);
-                                        }
-
-                                        // Hide window completely when opacity reaches 0
-                                        if current_o <= 0.01 && win.is_visible() {
-                                            win.set_visible(false);
-                                        }
-
-                                        // Show window when needed (without present() to avoid focus steal)
-                                        if target_o > 0.1 && !win.is_visible() {
-                                            win.set_visible(true);
-                                        }
-
-                                        glib::ControlFlow::Continue
-                                    });
-                                    anim_tick_id = Some(tick_id);
                                 }
                             }
                             OverlayMessage::HideRecording => {
@@ -135,13 +127,14 @@ impl Overlay {
                                 } else {
                                     text.clone()
                                 };
-                                status_dot.set_text("✅");
+                                let home = std::env::var("HOME").unwrap_or_else(|_| "/home/gui".into());
+                                status_dot.set_from_file(Some(format!("{}/.local/share/lumen/lumen_circle.png", home).as_str()));
                                 label.set_text(&preview);
                                 is_recording_state.store(false, std::sync::atomic::Ordering::Relaxed);
-                                is_visual_active.store(false, std::sync::atomic::Ordering::Relaxed);
-                                // Keep visible during transcription display
+                                is_visual_active.store(false, std::sync::atomic::Ordering::Relaxed); // let it auto-dismiss
                                 target_opacity.store(0.9f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
                                 last_activity.store(glib::monotonic_time() as u64, std::sync::atomic::Ordering::Relaxed);
+                                window.set_visible(true); // Garante que a overlay ative.
                             }
                             OverlayMessage::SetVolume(v) => {
                                 // Volume data is still received but NOT visualized (no waveform)
@@ -232,7 +225,7 @@ fn build_pill_window(app: &gtk4::Application) -> gtk4::Window {
         window.set_anchor(Edge::Left, false);
         window.set_anchor(Edge::Right, false);
         window.set_anchor(Edge::Top, false);
-        window.set_margin(Edge::Bottom, 60);
+        window.set_margin(Edge::Bottom, 25);
         window.set_keyboard_mode(KeyboardMode::None);  // ✅ Never grab keyboard
     }
 
@@ -251,7 +244,11 @@ fn build_pill_window(app: &gtk4::Application) -> gtk4::Window {
     container.set_can_target(false);
 
     // Status dot indicator (replaces waveform DrawingArea)
-    let status_dot = gtk4::Label::new(Some("🟢"));
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/gui".into());
+    let status_dot = gtk4::Image::builder()
+        .file(format!("{}/.local/share/lumen/lumen_circle.png", home))
+        .pixel_size(24)
+        .build();
     status_dot.add_css_class("status-dot");
     status_dot.set_can_target(false);
     container.append(&status_dot);
@@ -279,11 +276,12 @@ const PILL_CSS: &str = r#"
     .status-dot {
         font-size: 14px;
         min-width: 20px;
+        border-radius: 999px;
     }
     .transcription-label {
         color: #f0f0f0;
         font-family: inherit;
-        font-size: 13px;
+        font-size: 17px;
         font-weight: 600;
         letter-spacing: 0.4px;
     }
