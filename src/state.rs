@@ -212,4 +212,6 @@ pub struct TranscriptionRecord {
     pub processing_time_ms: u64,
     pub ai_used: bool,
     pub auto_sent: bool,
+    #[serde(default)]
+    pub is_wake_word_only: bool,
 }

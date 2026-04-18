@@ -3,12 +3,18 @@
 pub enum VoiceCommand {
     /// "envie", "mande", "envia" → Pressionar Enter para enviar
     Send,
-    /// "apague", "delete", "limpe" → Apagar o texto digitado
+    /// "apague", "delete", "limpe" → Selecionar tudo + Apagar
     Delete,
     /// "torne mais profissional", "reescreva formal" → Transformação com IA
     Transform { instruction: String },
     /// "nova linha", "enter" → Inserir quebra de linha no texto
     NewLine,
+    /// "selecionar tudo", "seleciona tudo" → Ctrl+A
+    SelectAll,
+    /// "copiar", "copia" → Ctrl+C
+    Copy,
+    /// "melhorar", "melhora", "melhore" → Ctrl+A → Ctrl+C → IA → Ctrl+V
+    Improve,
     /// Nenhum comando detectado — texto normal
     None,
 }
@@ -27,6 +33,10 @@ pub struct CommandDetector {
     delete_triggers: Vec<String>,
     transform_prefixes: Vec<String>,
     newline_triggers: Vec<String>,
+    select_all_triggers: Vec<String>,
+    copy_triggers: Vec<String>,
+    improve_triggers: Vec<String>,
+    write_prefixes: Vec<String>,
 }
 
 impl CommandDetector {
@@ -36,8 +46,10 @@ impl CommandDetector {
             send_triggers: vec![
                 "envie".into(),
                 "envia".into(),
+                "enviei".into(),
                 "mande".into(),
                 "manda".into(),
+                "mandei".into(),
                 "pode enviar".into(),
                 "send".into(),
                 "enviar".into(),
@@ -45,9 +57,11 @@ impl CommandDetector {
             delete_triggers: vec![
                 "apague".into(),
                 "apaga".into(),
+                "apaguei".into(),
                 "delete".into(),
                 "limpe".into(),
                 "limpa".into(),
+                "limpei".into(),
                 "apague tudo".into(),
             ],
             transform_prefixes: vec![
@@ -68,6 +82,36 @@ impl CommandDetector {
                 "próximo parágrafo".into(),
                 "pula linha".into(),
                 "new line".into(),
+            ],
+            select_all_triggers: vec![
+                "selecionar tudo".into(),
+                "selecione tudo".into(),
+                "seleciona tudo".into(),
+                "select all".into(),
+            ],
+            copy_triggers: vec![
+                "copiar".into(),
+                "copie".into(),
+                "copia".into(),
+                "copiei".into(),
+                "copy".into(),
+            ],
+            improve_triggers: vec![
+                "melhorar".into(),
+                "melhore".into(),
+                "melhora".into(),
+                "melhorei".into(),
+                "improve".into(),
+            ],
+            write_prefixes: vec![
+                "escreva".into(),
+                "escreve".into(),
+                "escrevi".into(),
+                "escrever".into(),
+                "digite".into(),
+                "digita".into(),
+                "digitei".into(),
+                "digitar".into(),
             ],
         }
     }
@@ -93,7 +137,47 @@ impl CommandDetector {
             }
         }
 
-        // 2. Verificar se o texto inteiro é um comando de transformação
+        // 2. Verificar se é comando de selecionar tudo
+        for trigger in &self.select_all_triggers {
+            if lower == *trigger {
+                return (String::new(), VoiceCommand::SelectAll);
+            }
+        }
+
+        // 3. Verificar se é comando de copiar
+        for trigger in &self.copy_triggers {
+            if lower == *trigger {
+                return (String::new(), VoiceCommand::Copy);
+            }
+        }
+
+        // 4. Verificar se é comando de melhorar com IA
+        for trigger in &self.improve_triggers {
+            if lower == *trigger {
+                return (String::new(), VoiceCommand::Improve);
+            }
+        }
+
+        // 5. Verificar se começar com comando de escrita (prefixo)
+        // Ex: "escreva a reunião foi boa" → injecta "A reunião foi boa"
+        for prefix in &self.write_prefixes {
+            if lower.starts_with(prefix) {
+                // Separa o que sobrou da string (removendo o prefixo)
+                let remaining = lower.strip_prefix(prefix).unwrap_or("").trim_start_matches(|c: char| c.is_ascii_punctuation()).trim();
+                if !remaining.is_empty() {
+                    // Repõe a primeira letra maiúscula após o corte se possível (estético)
+                    let mut capitalized = remaining.to_string();
+                    if let Some(c) = capitalized.chars().next() {
+                        capitalized = c.to_uppercase().collect::<String>() + &capitalized[c.len_utf8()..];
+                    }
+                    return (capitalized, VoiceCommand::None);
+                } else {
+                    return (String::new(), VoiceCommand::None);
+                }
+            }
+        }
+
+        // 6. Verificar se o texto inteiro é um comando de transformação
         for prefix in &self.transform_prefixes {
             if lower.starts_with(prefix) {
                 return (String::new(), VoiceCommand::Transform {
@@ -102,7 +186,7 @@ impl CommandDetector {
             }
         }
 
-        // 3. Verificar se o texto TERMINA com um comando de envio
+        // 6. Verificar se o texto TERMINA com um comando de envio
         //    Ex: "Olá mundo, envie" → texto "Olá mundo" + Send
         for trigger in &self.send_triggers {
             // Verificar final exato (com possível pontuação/espaço)
@@ -131,7 +215,7 @@ impl CommandDetector {
             }
         }
 
-        // 4. Substituir triggers de nova linha inline
+        // 7. Substituir triggers de nova linha inline
         //    Ex: "Primeiro parágrafo nova linha segundo parágrafo"
         let mut result = trimmed.to_string();
         let mut found_newline = false;
@@ -148,7 +232,7 @@ impl CommandDetector {
             return (result, VoiceCommand::NewLine);
         }
 
-        // 5. Nenhum comando detectado
+        // 8. Nenhum comando detectado
         (trimmed.to_string(), VoiceCommand::None)
     }
 }
@@ -228,4 +312,29 @@ mod tests {
         assert_eq!(text, "");
         assert_eq!(cmd, VoiceCommand::None);
     }
+
+    #[test]
+    fn test_select_all_command() {
+        let detector = CommandDetector::new();
+        let (text, cmd) = detector.detect("selecionar tudo");
+        assert_eq!(text, "");
+        assert_eq!(cmd, VoiceCommand::SelectAll);
+    }
+
+    #[test]
+    fn test_copy_command() {
+        let detector = CommandDetector::new();
+        let (text, cmd) = detector.detect("copiar");
+        assert_eq!(text, "");
+        assert_eq!(cmd, VoiceCommand::Copy);
+    }
+
+    #[test]
+    fn test_improve_command() {
+        let detector = CommandDetector::new();
+        let (text, cmd) = detector.detect("melhorar");
+        assert_eq!(text, "");
+        assert_eq!(cmd, VoiceCommand::Improve);
+    }
 }
+

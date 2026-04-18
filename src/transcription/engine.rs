@@ -77,6 +77,8 @@ impl TranscriptionEngine {
 
         // Configurações comuns
         params.set_language(Some(&self.language));
+        // O prompt inicial ajuda o modelo a não forçar traduções ou se perder ao ouvir inglês. 
+        params.set_initial_prompt("Este áudio mistura português do Brasil e algumas palavras ou termos em inglês (como tech, development, framework, API).");
         params.set_translate(false);
         params.set_print_special(false);
         params.set_print_progress(false);
@@ -156,6 +158,8 @@ fn should_skip_segment(seg: &str) -> bool {
         "[NOISE]",
         "(Música)",
         "(música)",
+        "[Música]",
+        "[música]",
         "(Applause)",
         "(aplausos)",
         "Legendas",

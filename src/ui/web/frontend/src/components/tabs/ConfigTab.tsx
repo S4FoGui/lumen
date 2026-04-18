@@ -5,7 +5,9 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, CheckCircle2 } from 'lucide-react';
+import { Save, Loader2, CheckCircle2, Zap, Target, Mic } from 'lucide-react';
+
+const MODEL_LABELS: Record<string, string> = { base: 'Base', small: 'Small', medium: 'Medium' };
 
 export function ConfigTab() {
   const [config, setConfig] = useState<any>(null);
@@ -53,26 +55,7 @@ export function ConfigTab() {
     setSavedStatus(false);
   };
 
-  const updateAiProviderConfig = (provider: string, key: string, value: any) => {
-    setConfig((prev: any) => {
-      // ✅ FIX: Verificar se prev e prev.ai existem
-      if (!prev || !prev.ai) {
-        console.warn('Config de AI não carregada ainda');
-        return prev;
-      }
-      return {
-        ...prev,
-        ai: {
-          ...prev.ai,
-          [provider]: {
-            ...(prev.ai[provider] || {}),
-            [key]: value
-          }
-        }
-      };
-    });
-    setSavedStatus(false);
-  };
+
 
   // Salvar no Backend
   const saveConfig = async () => {
@@ -102,7 +85,7 @@ export function ConfigTab() {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="w-8 h-8 animate-spin opacity-50" /></div>;
   }
 
-  const aiProvider = config.ai?.provider || 'disabled';
+
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
@@ -163,28 +146,143 @@ export function ConfigTab() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-4 p-4 rounded-lg border border-accent/20 bg-accent/5">
+                <h3 className="text-sm font-medium text-accent">Roteamento Dinâmico de Transcrição</h3>
+                <p className="text-xs text-muted-foreground">Escolha quais modelos carregar. Especifique quem assume áudios curtos e longos.</p>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Modelo p/ Áudios Curtos</Label>
+                    <Select 
+                      value={config.transcription.model_short || "base"} 
+                      onValueChange={(val) => updateConfig('transcription', 'model_short', val)}
+                    >
+                      <SelectTrigger className="w-full bg-background/50 border-border">
+                        <span>{MODEL_LABELS[config.transcription.model_short] || 'Base'}</span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="base" textValue="Base">
+                          <span className="flex items-center justify-between w-full gap-3">
+                            <span>Base</span>
+                            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                              <Zap className="w-3 h-3 text-yellow-400" />3v
+                              <Target className="w-3 h-3 text-red-400 ml-1" />1p
+                            </span>
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="small" textValue="Small">
+                          <span className="flex items-center justify-between w-full gap-3">
+                            <span>Small</span>
+                            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                              <Zap className="w-3 h-3 text-yellow-400" />2v
+                              <Target className="w-3 h-3 text-red-400 ml-1" />2p
+                            </span>
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="medium" textValue="Medium">
+                          <span className="flex items-center justify-between w-full gap-3">
+                            <span>Medium</span>
+                            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                              <Zap className="w-3 h-3 text-yellow-400" />1v
+                              <Target className="w-3 h-3 text-red-400 ml-1" />3p
+                            </span>
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-xs">Modelo p/ Áudios Longos</Label>
+                    <Select 
+                      value={config.transcription.model_long || "medium"} 
+                      onValueChange={(val) => updateConfig('transcription', 'model_long', val)}
+                    >
+                      <SelectTrigger className="w-full bg-background/50 border-border">
+                        <span>{MODEL_LABELS[config.transcription.model_long] || 'Medium'}</span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="base" textValue="Base">
+                          <span className="flex items-center justify-between w-full gap-3">
+                            <span>Base</span>
+                            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                              <Zap className="w-3 h-3 text-yellow-400" />3v
+                              <Target className="w-3 h-3 text-red-400 ml-1" />1p
+                            </span>
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="small" textValue="Small">
+                          <span className="flex items-center justify-between w-full gap-3">
+                            <span>Small</span>
+                            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                              <Zap className="w-3 h-3 text-yellow-400" />2v
+                              <Target className="w-3 h-3 text-red-400 ml-1" />2p
+                            </span>
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="medium" textValue="Medium">
+                          <span className="flex items-center justify-between w-full gap-3">
+                            <span>Medium</span>
+                            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                              <Zap className="w-3 h-3 text-yellow-400" />1v
+                              <Target className="w-3 h-3 text-red-400 ml-1" />3p
+                            </span>
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-xs">Corte de Duração (Segundos)</Label>
+                    <span className="text-xs text-accent font-mono">{config.transcription.duration_threshold_sec || 5.0} s</span>
+                  </div>
+                  <Input 
+                    type="number" 
+                    step="0.5"
+                    min="1.0"
+                    value={config.transcription.duration_threshold_sec || 5.0} 
+                    onChange={(e) => updateConfig('transcription', 'duration_threshold_sec', parseFloat(e.target.value) || 5.0)}
+                    className="bg-background/50 border-border"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Áudios maiores que este tempo vão para o Modelo Longo.</p>
+                </div>
+              </div>
               
-              <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-secondary/20 hover:bg-secondary/30 transition-colors">
+              <div className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${config.transcription.always_listening ? 'border-border bg-secondary/10 opacity-50 cursor-not-allowed' : 'border-border bg-secondary/20 hover:bg-secondary/30'}`}>
                 <div className="space-y-0.5">
                     <Label className="text-base font-semibold cursor-pointer" htmlFor="auto-send">Auto-Send (Enter Automático)</Label>
-                    <p className="text-sm text-muted-foreground">Envia a mensagem automaticamente logo após transcrever.</p>
+                    <p className="text-sm text-muted-foreground">
+                      {config.transcription.always_listening 
+                        ? 'Desativado — Always Listening usa Voice Commands para enviar.' 
+                        : 'Envia a mensagem automaticamente logo após transcrever.'}
+                    </p>
                 </div>
                 <Switch 
                   id="auto-send"
                   checked={config.transcription.auto_send} 
-                  onCheckedChange={(val) => updateConfig('transcription', 'auto_send', val)} 
+                  onCheckedChange={(val) => updateConfig('transcription', 'auto_send', val)}
+                  disabled={config.transcription.always_listening}
                 />
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-secondary/20 hover:bg-secondary/30 transition-colors">
+              <div className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${config.transcription.always_listening ? 'border-accent/30 bg-accent/5' : 'border-border bg-secondary/20 hover:bg-secondary/30'}`}>
                 <div className="space-y-0.5">
                     <Label className="text-base font-semibold text-accent cursor-pointer" htmlFor="voice-commands">Voice Commands</Label>
-                    <p className="text-sm text-muted-foreground">Habilita detecção de comandos ("apague", "nova linha", "envie").</p>
+                    <p className="text-sm text-muted-foreground">
+                      {config.transcription.always_listening
+                        ? 'Ativado automaticamente pelo Always Listening.'
+                        : 'Habilita detecção de comandos ("apague", "nova linha", "envie").'}
+                    </p>
                 </div>
                 <Switch 
                   id="voice-commands"
                   checked={config.transcription.voice_commands_enabled} 
-                  onCheckedChange={(val) => updateConfig('transcription', 'voice_commands_enabled', val)} 
+                  onCheckedChange={(val) => updateConfig('transcription', 'voice_commands_enabled', val)}
+                  disabled={config.transcription.always_listening}
                 />
               </div>
 
@@ -200,208 +298,74 @@ export function ConfigTab() {
                 />
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-secondary/20 hover:bg-secondary/30 transition-colors">
+              <div className="flex items-center justify-between p-4 rounded-lg border border-accent/40 bg-accent/10 hover:bg-accent/15 transition-colors shadow-[0_0_15px_rgba(163,230,53,0.08)]">
                 <div className="space-y-0.5">
-                    <Label className="text-base font-semibold text-accent cursor-pointer" htmlFor="always-listening">Sempre Escutando</Label>
+                    <div className="flex items-center gap-2">
+                      <Mic className="w-4 h-4 text-accent" />
+                      <Label className="text-base font-semibold text-accent cursor-pointer" htmlFor="always-listening">Sempre Escutando</Label>
+                    </div>
                     <p className="text-sm text-muted-foreground">Mantém o Lumen ouvindo continuamente e só processa quando detectar a palavra de ativação.</p>
                 </div>
                 <Switch
                   id="always-listening"
                   checked={config.transcription.always_listening || false}
-                  onCheckedChange={(val) => updateConfig('transcription', 'always_listening', val)}
+                  onCheckedChange={(val) => {
+                    // Inter-dependências automáticas
+                    const updates: Record<string, any> = { always_listening: val };
+                    if (val) {
+                      updates.auto_send = false;
+                      updates.voice_commands_enabled = true;
+                    } else {
+                      updates.voice_commands_enabled = false;
+                    }
+                    const newConfig = {
+                      ...config,
+                      transcription: { ...config.transcription, ...updates }
+                    };
+                    setConfig(newConfig);
+                    fetch('/api/config', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(newConfig)
+                    });
+                  }}
                 />
               </div>
 
               {(config.transcription.always_listening || false) && (
-                <div className="space-y-2 p-4 rounded-lg border border-accent/30 bg-accent/5">
-                  <Label>Palavra de ativação (wake word)</Label>
-                  <Input
-                    value={config.transcription.wake_word || 'lumen'}
-                    onChange={(e) => updateConfig('transcription', 'wake_word', e.target.value)}
-                    placeholder="lumen"
-                    className="bg-background/50 border-border"
-                  />
-                  <p className="text-xs text-muted-foreground">Exemplo: diga "Lumen, escreva ..." para ativar.</p>
-                </div>
-              )}
-          </CardContent>
-        </Card>
-
-        {/* AI Formatter Config */}
-        <Card className="bg-card/50 backdrop-blur border-border overflow-hidden">
-          <CardHeader>
-              <CardTitle>AI Formatter</CardTitle>
-              <CardDescription>IA responsável por formatar e processar comandos complexos do texto.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-4 rounded-lg border border-accent/30 bg-accent/5">
-                <div className="space-y-0.5">
-                    <Label className="text-base font-semibold text-accent cursor-pointer" htmlFor="auto-formatting">Auto-Improve (Correção por IA)</Label>
-                    <p className="text-sm text-muted-foreground">Melhora gramática e remove vícios de linguagem ("humm", "tipo") automaticamente de TUDO que for transcrito usando o provedor abaixo.</p>
-                </div>
-                <Switch 
-                  id="auto-formatting"
-                  checked={config.ai.auto_formatting} 
-                  onCheckedChange={(val) => updateConfig('ai', 'auto_formatting', val)} 
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Provider Central</Label>
-                <Select 
-                  value={aiProvider} 
-                  onValueChange={(val) => updateConfig('ai', 'provider', val)}
-                >
-                  <SelectTrigger className="w-full bg-secondary/50 border-border">
-                    <SelectValue placeholder="Selecione um Provedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="disabled">Desabilitado</SelectItem>
-                    <SelectItem value="omniroute">OmniRoute (Multi-Model Gateway)</SelectItem>
-                    <SelectItem value="ollama">Ollama (Local / Offline)</SelectItem>
-                    <SelectItem value="openai">OpenAI (Cloud)</SelectItem>
-                    <SelectItem value="gemini">Google Gemini (Cloud)</SelectItem>
-                    <SelectItem value="groq">Groq (High-Speed Llama)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {aiProvider === 'omniroute' && (
-                <div className="animate-in fade-in slide-in-from-top-2 space-y-4 p-4 rounded-md border border-border bg-secondary/10">
+                <div className="space-y-4 p-4 rounded-lg border border-accent/30 bg-accent/5 animate-in fade-in slide-in-from-top-2">
                   <div className="space-y-2">
-                    <Label>URL Base do Gateway</Label>
-                    <Input 
-                      value={config.ai.omniroute?.url || ''} 
-                      onChange={(e) => updateAiProviderConfig('omniroute', 'url', e.target.value)}
-                      placeholder="http://cloud.omniroute.online/v1" 
-                      className="bg-background/50 border-border" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Bearer Token (API Key)</Label>
-                    <Input 
-                      type="password" 
-                      value={config.ai.omniroute?.api_key || ''} 
-                      onChange={(e) => updateAiProviderConfig('omniroute', 'api_key', e.target.value)}
-                      placeholder="seu-api-key-aqui" 
-                      className="bg-background/50 border-border" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Modelo Alvo</Label>
-                    <Input 
-                      value={config.ai.omniroute?.model || ''} 
-                      onChange={(e) => updateAiProviderConfig('omniroute', 'model', e.target.value)}
-                      placeholder="openai/text-embedding-3-small..." 
-                      className="bg-background/50 border-border" 
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">API 100% compatível com OpenAI. Encaminha para 60+ provedores.</p>
-                </div>
-              )}
-
-              {aiProvider === 'ollama' && (
-                <div className="animate-in fade-in slide-in-from-top-2 space-y-4 p-4 rounded-md border border-border bg-secondary/10">
-                  <div className="space-y-2">
-                    <Label>Endpoint URL</Label>
-                    <Input 
-                      value={config.ai.ollama?.url || ''} 
-                      onChange={(e) => updateAiProviderConfig('ollama', 'url', e.target.value)}
-                      placeholder="http://127.0.0.1:11434" 
-                      className="bg-background/50 border-border" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Opcional: API Key (Bearer Token)</Label>
-                    <Input 
-                      type="password" 
-                      value={config.ai.ollama?.api_key || ''} 
-                      onChange={(e) => updateAiProviderConfig('ollama', 'api_key', e.target.value)}
-                      placeholder="Caso use o Ollama via NGINX/Proxy" 
-                      className="bg-background/50 border-border" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Modelo</Label>
-                    <Input 
-                      value={config.ai.ollama?.model || ''} 
-                      onChange={(e) => updateAiProviderConfig('ollama', 'model', e.target.value)}
-                      placeholder="llama3, gemma2..." 
-                      className="bg-background/50 border-border" 
-                    />
-                  </div>
-                </div>
-              )}
-
-              {aiProvider === 'openai' && (
-                <div className="animate-in fade-in slide-in-from-top-2 space-y-4 p-4 rounded-md border border-border bg-secondary/10">
-                  <div className="space-y-2">
-                    <Label>API Key</Label>
-                    <Input 
-                      type="password" 
-                      value={config.ai.openai?.api_key || ''} 
-                      onChange={(e) => updateAiProviderConfig('openai', 'api_key', e.target.value)}
-                      placeholder="sk-..." 
-                      className="bg-background/50 border-border" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Modelo</Label>
-                    <Input 
-                      value={config.ai.openai?.model || ''} 
-                      onChange={(e) => updateAiProviderConfig('openai', 'model', e.target.value)}
-                      placeholder="gpt-4o-mini" 
-                      className="bg-background/50 border-border" 
-                    />
-                  </div>
-                </div>
-              )}
-
-              {aiProvider === 'gemini' && (
-                <div className="animate-in fade-in slide-in-from-top-2 space-y-4 p-4 rounded-md border border-border bg-secondary/10">
-                  <div className="space-y-2">
-                    <Label>Google API Key</Label>
+                    <Label>Palavra de ativação (wake word)</Label>
                     <Input
-                      type="password"
-                      value={config.ai.gemini?.api_key || ''}
-                      onChange={(e) => updateAiProviderConfig('gemini', 'api_key', e.target.value)}
-                      placeholder="AIza..."
+                      value={config.transcription.wake_word || 'lumen'}
+                      onChange={(e) => updateConfig('transcription', 'wake_word', e.target.value)}
+                      placeholder="lumen"
                       className="bg-background/50 border-border"
                     />
+                    <p className="text-xs text-muted-foreground">Exemplo: diga "Lumen, escreva ..." para ativar.</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Modelo</Label>
-                    <Input
-                      value={config.ai.gemini?.model || ''}
-                      onChange={(e) => updateAiProviderConfig('gemini', 'model', e.target.value)}
-                      placeholder="gemini-1.5-flash"
-                      className="bg-background/50 border-border"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">Obtenha sua API key em makersuite.google.com/app/apikey</p>
-                </div>
-              )}
 
-              {aiProvider === 'groq' && (
-                <div className="animate-in fade-in slide-in-from-top-2 space-y-4 p-4 rounded-md border border-border bg-secondary/10">
-                  <div className="space-y-2">
-                    <Label>Groq API Key</Label>
-                    <Input
-                      type="password"
-                      value={config.ai.groq?.api_key || ''}
-                      onChange={(e) => updateAiProviderConfig('groq', 'api_key', e.target.value)}
-                      placeholder="gsk_..."
-                      className="bg-background/50 border-border"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Modelo</Label>
-                    <Input
-                      value={config.ai.groq?.model || ''}
-                      onChange={(e) => updateAiProviderConfig('groq', 'model', e.target.value)}
-                      placeholder="llama-3.3-70b-versatile"
-                      className="bg-background/50 border-border"
-                    />
+                  <div className="border-t border-border/50 pt-3">
+                    <h4 className="text-sm font-medium text-accent mb-3">Comandos Disponíveis</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { cmd: '"Escreva" / "Digite"', desc: 'Transcreve e digita exatamente o que você disser', icon: '📝' },
+                        { cmd: '"Apague"', desc: 'Apaga todo o texto do campo', icon: '🗑️' },
+                        { cmd: '"Selecionar tudo"', desc: 'Seleciona todo o texto (Ctrl+A)', icon: '📋' },
+                        { cmd: '"Copiar"', desc: 'Copia o texto selecionado (Ctrl+C)', icon: '📄' },
+                        { cmd: '"Melhorar"', desc: 'Seleciona tudo, envia para IA e cola versão melhorada', icon: '✨' },
+                        { cmd: '"Envie"', desc: 'Pressiona Enter para enviar a mensagem', icon: '📤' },
+                        { cmd: '"Nova linha"', desc: 'Insere uma quebra de linha', icon: '↵' },
+                      ].map(({cmd, desc, icon}) => (
+                        <div key={cmd} className="flex items-start gap-2 p-2 rounded-md bg-secondary/20 border border-border/50">
+                          <span className="text-base mt-0.5">{icon}</span>
+                          <div>
+                            <p className="text-xs font-mono font-semibold text-accent">{cmd}</p>
+                            <p className="text-[10px] text-muted-foreground leading-tight">{desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

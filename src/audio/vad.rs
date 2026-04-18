@@ -67,13 +67,16 @@ impl VoiceActivityDetector {
         self.smoothed_rms = self.smoothing_factor * rms
             + (1.0 - self.smoothing_factor) * self.smoothed_rms;
 
-        // Atualizar noise floor apenas quando sinal é baixo
-        if self.smoothed_rms < self.noise_floor * 2.5 {
-            self.noise_floor = self.noise_alpha * rms
-                + (1.0 - self.noise_alpha) * self.noise_floor;
-            if self.noise_floor < 0.001 {
-                self.noise_floor = 0.001;
-            }
+        // Atualizar noise floor apenas quando o sinal cair (adaptação rápida para baixo)
+        // ou adaptar *muito* lentamente para cima se for ruído de fundo (mas sem invadir o limiar de voz).
+        if self.smoothed_rms < self.noise_floor {
+            self.noise_floor = self.noise_alpha * rms + (1.0 - self.noise_alpha) * self.noise_floor;
+        } else if self.smoothed_rms < self.initial_threshold * 1.5 {
+            self.noise_floor = (self.noise_alpha / 10.0) * rms + (1.0 - (self.noise_alpha / 10.0)) * self.noise_floor;
+        }
+        
+        if self.noise_floor < 0.001 {
+            self.noise_floor = 0.001;
         }
 
         // ✅ Threshold 4x o noise floor (mais discriminativo)
@@ -178,6 +181,7 @@ mod tests {
         let speech: Vec<f32> = (0..6400).map(|i| (i as f32 * 0.01).sin() * 0.5).collect();
         for chunk in speech.chunks(800) {
             vad.process(chunk);
+            std::thread::sleep(std::time::Duration::from_millis(50));
         }
         assert!(vad.has_detected_voice());
 

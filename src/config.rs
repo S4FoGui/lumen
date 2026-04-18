@@ -29,6 +29,12 @@ pub struct AudioConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranscriptionConfig {
     pub model_path: Option<String>,
+    #[serde(default = "default_short_model")]
+    pub model_short: String,
+    #[serde(default = "default_long_model")]
+    pub model_long: String,
+    #[serde(default = "default_duration_threshold")]
+    pub duration_threshold_sec: f64,
     pub language: String,
     pub lightning_mode: bool,
     pub filler_words: Vec<String>,
@@ -51,6 +57,18 @@ pub struct TranscriptionConfig {
 
 fn default_silence_threshold() -> u64 {
     1500
+}
+
+fn default_short_model() -> String {
+    "base".to_string()
+}
+
+fn default_long_model() -> String {
+    "medium".to_string()
+}
+
+fn default_duration_threshold() -> f64 {
+    5.0
 }
 
 fn default_true() -> bool {
@@ -94,6 +112,12 @@ pub struct AiConfig {
     #[serde(default)]
     pub omniroute: OmniRouteConfig,
     pub default_instruction: String,
+    /// Nome do prompt ativo (chave no mapa custom_prompts). Se vazio ou ausente, usa default_instruction.
+    #[serde(default)]
+    pub active_prompt_name: String,
+    /// Prompts personalizados criados pelo usuário {nome: conteúdo}
+    #[serde(default)]
+    pub custom_prompts: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -227,12 +251,9 @@ impl LumenConfig {
             .join("lumen")
     }
 
-    /// Retorna o caminho do modelo Whisper
-    pub fn model_path(&self) -> PathBuf {
-        match &self.transcription.model_path {
-            Some(path) => PathBuf::from(path),
-            None => Self::data_dir().join("models").join("ggml-small.bin"),
-        }
+    /// Retorna o caminho para qualquer variante do modelo Whisper
+    pub fn get_model_path(model_name: &str) -> PathBuf {
+        Self::data_dir().join("models").join(format!("ggml-{}.bin", model_name))
     }
 }
 

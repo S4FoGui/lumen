@@ -101,8 +101,7 @@ async fn main() -> Result<()> {
     let open_on_start = config.ui.open_on_start;
     let show_tray = config.ui.show_tray;
     let silence_threshold_ms = config.transcription.silence_threshold_ms;
-    // Always Listening DESATIVADO - comportamento 100% manual via hotkey (2x Enter)
-    let mut always_listening = false;
+    let mut always_listening = config.transcription.always_listening;
     let mut wake_word = config.transcription.wake_word.to_lowercase();
 
     // 1. Analytics DB
@@ -124,29 +123,49 @@ async fn main() -> Result<()> {
         )
     ));
 
-    // 2. Motor de transcrição
-    let model_path = config.model_path();
-    let transcription_engine = if model_path.exists() {
+    // 2. Motor de transcrição (Curto e Longo baseados na configuração)
+    let short_name = config.transcription.model_short.as_str();
+    let long_name = config.transcription.model_long.as_str();
+    
+    let path_short = config::LumenConfig::get_model_path(short_name);
+    let path_long = config::LumenConfig::get_model_path(long_name);
+
+    let engine_short = if path_short.exists() {
         match transcription::engine::TranscriptionEngine::new(
-            &model_path,
+            &path_short,
             &config.transcription.language,
             config.transcription.lightning_mode,
         ) {
             Ok(engine) => Some(Arc::new(engine)),
             Err(e) => {
-                tracing::warn!("⚠️ Motor de transcrição não disponível: {}", e);
-                tracing::warn!("   Baixe o modelo com:");
-                tracing::warn!("   mkdir -p {}", model_path.parent().unwrap_or(&model_path).display());
-                tracing::warn!("   curl -L -o {} https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin", model_path.display());
+                tracing::warn!("⚠️ Motor {} não disponível: {}", short_name, e);
                 None
             }
         }
     } else {
-        tracing::warn!("⚠️ Modelo Whisper não encontrado em: {}", model_path.display());
-        tracing::warn!("   O Lumen iniciará sem transcrição.");
-        tracing::warn!("   Baixe o modelo com:");
-        tracing::warn!("   mkdir -p {}", model_path.parent().unwrap_or(&model_path).display());
-        tracing::warn!("   curl -L -o {} https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin", model_path.display());
+        tracing::warn!("⚠️ Modelo Whisper {} não encontrado em: {}", short_name, path_short.display());
+        tracing::warn!("   Baixe com: curl -L -o {} https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{}.bin", path_short.display(), short_name);
+        None
+    };
+
+    let engine_long = if short_name == long_name {
+        tracing::info!("🔄 Usando mesmo modelo ({}) para ambas durações", short_name);
+        engine_short.clone()
+    } else if path_long.exists() {
+        match transcription::engine::TranscriptionEngine::new(
+            &path_long,
+            &config.transcription.language,
+            config.transcription.lightning_mode,
+        ) {
+            Ok(engine) => Some(Arc::new(engine)),
+            Err(e) => {
+                tracing::warn!("⚠️ Motor {} não disponível: {}", long_name, e);
+                None
+            }
+        }
+    } else {
+        tracing::warn!("⚠️ Modelo Whisper {} não encontrado em: {}", long_name, path_long.display());
+        tracing::warn!("   Baixe com: curl -L -o {} https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{}.bin", path_long.display(), long_name);
         None
     };
 
@@ -163,16 +182,21 @@ async fn main() -> Result<()> {
         ).await
     ));
 
-    // 6. Pipeline de transcrição (NOVO — integra VAD, Commands, Auto-Send)
-    let pipeline = transcription_engine.as_ref().map(|engine| {
-        Arc::new(TranscriptionPipeline::new(
+    // 6. Pipeline de transcrição (Integra roteamento duplo dependendo do audio)
+    let pipeline = if engine_short.is_some() || engine_long.is_some() {
+        Some(Arc::new(TranscriptionPipeline::new(
             Arc::clone(&lumen_state),
-            Arc::clone(engine),
+            engine_short,
+            engine_long,
             filler_filter,
             Arc::clone(&text_injector),
             Arc::clone(&analytics_db),
-        ))
-    });
+            config.transcription.duration_threshold_sec,
+        )))
+    } else {
+        tracing::error!("Nenhum motor Whisper encontrado. O Lumen iniciará sem transcrição.");
+        None
+    };
 
     // 6. VAD — Voice Activity Detector (NOVO)
     let vad = Arc::new(RwLock::new(
@@ -229,7 +253,18 @@ async fn main() -> Result<()> {
     // Canal para VAD enviar sinal de fim de fala
     let (vad_tx, mut vad_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
 
-    // Modo 100% manual - aguardando hotkey (2x Enter) para iniciar
+    // Se always_listening está ativo desde o boot, iniciar captura imediatamente
+    if always_listening {
+        tracing::info!("🎧 Always Listening ativo desde o boot — iniciando captura contínua");
+        start_continuous_capture(
+            &mut recording,
+            &lumen_state,
+            &audio_capture,
+            &mut overlay,
+            &vad,
+            &vad_tx,
+        ).await;
+    }
 
     // Subscrever ao event bus para reagir a mudanças de config em tempo real
     let mut config_event_rx = lumen_state.event_tx.subscribe();
@@ -240,27 +275,41 @@ async fn main() -> Result<()> {
             Ok(event) = config_event_rx.recv() => {
                 if matches!(event, LumenEvent::ConfigChanged) {
                     let new_config = lumen_state.config.read().await;
-                    let _new_always_listening = new_config.transcription.always_listening;
+                    let new_always_listening = new_config.transcription.always_listening;
                     let new_wake_word = new_config.transcription.wake_word.to_lowercase();
                     drop(new_config);
 
-                    // Always Listening está DESATIVADO - sempre força false
-                    // Ignora qualquer tentativa de ativação via dashboard
-                    if always_listening && recording {
-                        // Se por algum motivo estiver gravando, para
-                        tracing::info!("🎧 Modo manual: parando gravação ativa");
-                        handle_stop_and_process(
-                            &mut recording,
-                            &lumen_state,
-                            &audio_capture,
-                            &pipeline,
-                            &mut overlay,
-                            false,
-                            "lumen",
-                        ).await;
-                    }
-                    always_listening = false;
                     wake_word = new_wake_word;
+
+                    // Transição de estado do Always Listening
+                    if new_always_listening && !always_listening {
+                        // Acabou de ser ativado
+                        tracing::info!("🎧 Always Listening ATIVADO via dashboard");
+                        always_listening = true;
+                        if !recording {
+                            start_continuous_capture(
+                                &mut recording,
+                                &lumen_state,
+                                &audio_capture,
+                                &mut overlay,
+                                &vad,
+                                &vad_tx,
+                            ).await;
+                        }
+                    } else if !new_always_listening && always_listening {
+                        // Acabou de ser desativado
+                        tracing::info!("🎧 Always Listening DESATIVADO via dashboard");
+                        always_listening = false;
+                        if recording {
+                            // Parar gravação silenciosamente
+                            *lumen_state.is_recording.write().await = false;
+                            lumen_state.emit(LumenEvent::RecordingStopped);
+                            let mut capture = audio_capture.write().await;
+                            let _ = capture.stop();
+                            recording = false;
+                            overlay.hide_recording().ok();
+                        }
+                    }
                 }
             }
 
@@ -312,7 +361,20 @@ async fn main() -> Result<()> {
                         always_listening,
                         &wake_word,
                     ).await;
-                    // Modo 100% manual - sem reinício automático
+
+                    // Always Listening: reiniciar captura após processar
+                    if always_listening {
+                        tracing::info!("🎧 Always Listening: reiniciando captura...");
+                        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+                        start_continuous_capture(
+                            &mut recording,
+                            &lumen_state,
+                            &audio_capture,
+                            &mut overlay,
+                            &vad,
+                            &vad_tx,
+                        ).await;
+                    }
                 }
             }
 
@@ -364,6 +426,107 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Start continuous capture (Always Listening)
+// ═══════════════════════════════════════════════════════════════
+
+async fn start_continuous_capture(
+    recording: &mut bool,
+    state: &Arc<LumenState>,
+    audio_capture: &Arc<RwLock<audio::capture::AudioCapture>>,
+    overlay: &mut ui::overlay::Overlay,
+    vad: &Arc<RwLock<VoiceActivityDetector>>,
+    vad_tx: &tokio::sync::mpsc::UnboundedSender<()>,
+) {
+    *recording = true;
+    *state.is_recording.write().await = true;
+    state.emit(LumenEvent::RecordingStarted);
+    // No overlay em modo always listening (silencioso)
+
+    // Reset VAD
+    {
+        let mut v = vad.write().await;
+        v.reset();
+    }
+
+    let mut capture = audio_capture.write().await;
+
+    // Sincronizar dispositivo da config
+    {
+        let current_config = state.config.read().await;
+        capture.set_device(current_config.audio.device.clone());
+    }
+
+    if let Err(e) = capture.start() {
+        tracing::error!("Falha ao iniciar captura contínua: {}", e);
+        *recording = false;
+        *state.is_recording.write().await = false;
+        state.emit(LumenEvent::RecordingStopped);
+        return;
+    }
+
+    // Spawn VAD monitoring (mesma lógica do toggle)
+    let vad_clone = Arc::clone(vad);
+    let capture_samples = capture.samples_ref();
+    let vad_tx_clone = vad_tx.clone();
+    let state_clone = Arc::clone(state);
+    let overlay_sender = overlay.clone_sender();
+
+    tokio::spawn(async move {
+        let overlay_sender = overlay_sender.clone();
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(30));
+        let mut last_len = 0usize;
+
+        loop {
+            interval.tick().await;
+
+            if !*state_clone.is_recording.read().await {
+                break;
+            }
+
+            let new_samples = {
+                if let Ok(samples) = capture_samples.lock() {
+                    if samples.len() < last_len {
+                        last_len = 0;
+                    }
+                    if samples.len() > last_len {
+                        let chunk = samples[last_len..].to_vec();
+                        last_len = samples.len();
+                        Some(chunk)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            };
+
+            if let Some(chunk) = new_samples {
+                let mut v = vad_clone.write().await;
+                let vad_state = v.process(&chunk);
+
+                match vad_state {
+                    VadState::Speaking { rms } => {
+                        state_clone.emit(LumenEvent::AudioLevel { rms });
+                        let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::SetVolume(rms));
+                    }
+                    VadState::Silence { rms } => {
+                        state_clone.emit(LumenEvent::AudioLevel { rms });
+                        let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::SetVolume(rms));
+                    }
+                    VadState::SpeechEnded => {
+                        tracing::debug!("VAD: SpeechEnded signal (always listening)");
+                        let _ = vad_tx_clone.send(());
+                        break;
+                    }
+                }
+            }
+        }
+    });
+
+    tracing::info!("🎧 Captura contínua iniciada (Always Listening)");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -559,20 +722,12 @@ async fn handle_stop_and_process(
             tracing::info!("🧠 Iniciando transcrição em segundo plano...");
             match pipe.process(samples).await {
                 Ok(record) => {
-                    // Wake word gate no modo always listening
-                    if always {
-                        let lower = record.raw_text.to_lowercase();
-                        let wake_lower = wake.to_lowercase();
-                        let has_wake = lower.starts_with(&wake_lower)
-                            || lower.contains(&format!("{} ", wake_lower))
-                            || lower.contains(&format!("{}:", wake_lower));
-
-                        if !has_wake {
-                            tracing::info!("🎧 Always Listening: wake word não detectada");
-                            tracing::info!("🎧 Always Listening: wake word detectada");
-                        }
+                    if record.is_wake_word_only {
+                        tracing::info!("🎤 Wake word detectada isoladamente! Mostrando feedback visual.");
+                        let _ = overlay_sender.try_send(ui::overlay::OverlayMessage::UpdateTranscription("Ouvindo comando...".to_string()));
+                        // Como Always Listening está ativo, o main loop de gravação vai automaticamente recomeçar a captura.
                     } else if record.processed_text.is_empty() {
-                        tracing::debug!("Modo normal: texto processado está vazio");
+                        tracing::debug!("Texto final descartado ou vazio.");
                     }
                 }
                 Err(e) => {
