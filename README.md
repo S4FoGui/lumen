@@ -108,17 +108,37 @@ Acesse `http://localhost:8484` para o painel de controle web com:
 
 ## 📋 Dependências do Sistema
 
+Para rodar o Lumen compilado, seu sistema precisará de ferramentas de áudio (ALSA), interface (GTK4) e área de transferência.
+
 ### Arch Linux
+**Para Executar:**
 ```bash
-sudo pacman -S gtk4 alsa-lib libnotify xdotool
+sudo pacman -S gtk4 alsa-lib xclip wl-clipboard
+```
+**Para Compilar (Build):**
+```bash
+sudo pacman -S base-devel pkgconf
 ```
 
 ### Debian/Ubuntu
+**Para Executar:**
 ```bash
-sudo apt install libgtk-4-1 libasound2 libnotify-bin xdotool
+sudo apt install libgtk-4-1 libasound2 xclip wl-clipboard
+```
+**Para Compilar (Build):**
+```bash
+sudo apt install build-essential pkg-config libgtk-4-dev libasound2-dev
 ```
 
-## 📄 Licença
+### ⚠️ Permissão Crucial (Para Injeção de Texto Automática)
+O Lumen usa o moderno injetor kernel-level (`uinput`) para garantir que o texto seja colado fluidamente debaixo dos panos, furando bloqueios do Wayland nativamente.
+
+Para que seu teclado fantasma funcione sem precisar usar `sudo`, adicione seu usuário ao grupo `input` e recarregue as regras:
+
+```bash
+sudo usermod -aG input $USER
+# (Obrigatório reiniciar o computador ou fazer logout para a permissão do grupo funcionar)
+```
 
 MIT License — veja [LICENSE](LICENSE).
 
