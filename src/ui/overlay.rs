@@ -37,12 +37,6 @@ impl Overlay {
                     .and_then(|c| c.downcast::<gtk4::Box>().ok())
                     .expect("Falha ao inicializar container do overlay (Box)");
 
-                // Status dot (replaces the old DrawingArea waveform)
-                let status_dot: gtk4::Image = container
-                    .first_child()
-                    .and_then(|c| c.downcast::<gtk4::Image>().ok())
-                    .expect("Falha ao inicializar status dot do overlay");
-
                 let label: gtk4::Label = container
                     .last_child()
                     .and_then(|c| c.downcast::<gtk4::Label>().ok())
@@ -102,8 +96,6 @@ impl Overlay {
                     while let Ok(msg) = receiver_clone.recv().await {
                         match msg {
                             OverlayMessage::ShowRecording => {
-                                let home = std::env::var("HOME").unwrap_or_else(|_| "/home/gui".into());
-                                status_dot.set_from_file(Some(format!("{}/.local/share/lumen/lumen_circle.png", home).as_str()));
                                 label.set_text("Ouvindo...");
                                 is_recording_state.store(true, std::sync::atomic::Ordering::Relaxed);
                                 is_visual_active.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -127,8 +119,6 @@ impl Overlay {
                                 } else {
                                     text.clone()
                                 };
-                                let home = std::env::var("HOME").unwrap_or_else(|_| "/home/gui".into());
-                                status_dot.set_from_file(Some(format!("{}/.local/share/lumen/lumen_circle.png", home).as_str()));
                                 label.set_text(&preview);
                                 is_recording_state.store(false, std::sync::atomic::Ordering::Relaxed);
                                 is_visual_active.store(false, std::sync::atomic::Ordering::Relaxed); // let it auto-dismiss
@@ -229,29 +219,63 @@ fn build_pill_window(app: &gtk4::Application) -> gtk4::Window {
         window.set_keyboard_mode(KeyboardMode::None);  // ✅ Never grab keyboard
     }
 
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/gui".into());
+    let css = format!(r#"
+        window {{
+            background: transparent;
+        }}
+        .pill-container {{
+            background-color: rgba(18, 18, 18, 0.90);
+            border: 1px solid rgba(163, 230, 53, 0.25);
+            border-radius: 999px;
+            padding: 9px 20px 9px 12px;
+            box-shadow: 0px 5px 22px rgba(163, 230, 53, 0.12);
+        }}
+        .status-dot-frame {{
+            background-image: url("file://{}/.local/share/lumen/lumen_circle.png");
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-position: center;
+            border: 1px solid rgba(163, 230, 53, 0.22);
+            border-radius: 999px;
+            min-width: 36px;
+            min-height: 36px;
+            padding: 0;
+            margin: 0;
+        }}
+        .transcription-label {{
+            color: #f0f0f0;
+            font-family: inherit;
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            margin-left: 8px;
+        }}
+    "#, home);
+
     let provider = gtk4::CssProvider::new();
-    provider.load_from_data(PILL_CSS);
+    provider.load_from_data(&css);
     gtk4::style_context_add_provider_for_display(
         &gtk4::gdk::Display::default().expect("Could not connect to a display."),
         &provider,
         gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
 
-    let container = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
+    let container = gtk4::Box::new(gtk4::Orientation::Horizontal, 10);
     container.add_css_class("pill-container");
     container.set_halign(gtk4::Align::Center);
     container.set_valign(gtk4::Align::Center);
     container.set_can_target(false);
 
     // Status dot indicator (replaces waveform DrawingArea)
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/gui".into());
-    let status_dot = gtk4::Image::builder()
-        .file(format!("{}/.local/share/lumen/lumen_circle.png", home))
-        .pixel_size(24)
-        .build();
-    status_dot.add_css_class("status-dot");
-    status_dot.set_can_target(false);
-    container.append(&status_dot);
+    // Now handled entirely by CSS background-image
+    let icon_frame = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
+    icon_frame.add_css_class("status-dot-frame");
+    icon_frame.set_overflow(gtk4::Overflow::Hidden);
+    icon_frame.set_halign(gtk4::Align::Center);
+    icon_frame.set_valign(gtk4::Align::Center);
+    icon_frame.set_can_target(false);
+    container.append(&icon_frame);
 
     let label = gtk4::Label::new(Some("Ouvindo..."));
     label.add_css_class("transcription-label");
@@ -262,27 +286,4 @@ fn build_pill_window(app: &gtk4::Application) -> gtk4::Window {
     window
 }
 
-const PILL_CSS: &str = r#"
-    window {
-        background: transparent;
-    }
-    .pill-container {
-        background-color: rgba(18, 18, 18, 0.90);
-        border: 1px solid rgba(163, 230, 53, 0.25);
-        border-radius: 999px;
-        padding: 8px 20px 8px 14px;
-        box-shadow: 0px 4px 24px rgba(163, 230, 53, 0.12);
-    }
-    .status-dot {
-        font-size: 14px;
-        min-width: 20px;
-        border-radius: 999px;
-    }
-    .transcription-label {
-        color: #f0f0f0;
-        font-family: inherit;
-        font-size: 17px;
-        font-weight: 600;
-        letter-spacing: 0.4px;
-    }
-"#;
+

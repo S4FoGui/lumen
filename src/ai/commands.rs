@@ -162,8 +162,10 @@ impl CommandDetector {
         // Ex: "escreva a reunião foi boa" → injecta "A reunião foi boa"
         for prefix in &self.write_prefixes {
             if lower.starts_with(prefix) {
-                // Separa o que sobrou da string (removendo o prefixo)
-                let remaining = lower.strip_prefix(prefix).unwrap_or("").trim_start_matches(|c: char| c.is_ascii_punctuation()).trim();
+                // Remove o prefixo usando o texto original para preservar maiúsculas/minúsculas ditadas.
+                let remaining = trimmed[prefix.len()..]
+                    .trim_start_matches(|c: char| c.is_ascii_punctuation())
+                    .trim();
                 if !remaining.is_empty() {
                     // Repõe a primeira letra maiúscula após o corte se possível (estético)
                     let mut capitalized = remaining.to_string();
@@ -336,5 +338,12 @@ mod tests {
         assert_eq!(text, "");
         assert_eq!(cmd, VoiceCommand::Improve);
     }
-}
 
+    #[test]
+    fn test_write_command_preserves_original_case() {
+        let detector = CommandDetector::new();
+        let (text, cmd) = detector.detect("Escreva João da Silva na Empresa XPTO");
+        assert_eq!(text, "João da Silva na Empresa XPTO");
+        assert_eq!(cmd, VoiceCommand::None);
+    }
+}

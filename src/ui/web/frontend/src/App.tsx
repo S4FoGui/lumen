@@ -16,6 +16,7 @@ export default function App() {
   
   // Conecta ao WebSocket do backend Rust!
   const { status, rms, isConnected, lastTranscription, lastError } = useLumenSocket();
+  const showFloatingListeningOverlay = status.is_recording && activeTab !== 'status';
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
@@ -72,7 +73,7 @@ export default function App() {
         )}
 
         {/* Overlay global de escuta — visível em qualquer aba enquanto gravando */}
-        {status.is_recording && (
+        {showFloatingListeningOverlay && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-card/90 backdrop-blur border border-accent/40 shadow-[0_0_30px_rgba(163,230,53,0.15)] animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />

@@ -5,9 +5,54 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, CheckCircle2, Zap, Target, Mic } from 'lucide-react';
+import { Save, Loader2, CheckCircle2, Zap, Target, Mic, PencilLine, Eraser, ClipboardCheck, Copy, Sparkles, SendHorizontal, CornerDownLeft } from 'lucide-react';
 
 const MODEL_LABELS: Record<string, string> = { base: 'Base', small: 'Small', medium: 'Medium' };
+
+const AVAILABLE_COMMANDS = [
+  {
+    cmd: '"Escreva" / "Digite"',
+    desc: 'Transcreve e digita exatamente o que você disser',
+    Icon: PencilLine,
+    iconClasses: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25',
+  },
+  {
+    cmd: '"Apague"',
+    desc: 'Apaga todo o texto do campo',
+    Icon: Eraser,
+    iconClasses: 'text-rose-300 bg-rose-500/10 border-rose-500/25',
+  },
+  {
+    cmd: '"Selecionar tudo"',
+    desc: 'Seleciona todo o texto (Ctrl+A)',
+    Icon: ClipboardCheck,
+    iconClasses: 'text-sky-300 bg-sky-500/10 border-sky-500/25',
+  },
+  {
+    cmd: '"Copiar"',
+    desc: 'Copia o texto selecionado (Ctrl+C)',
+    Icon: Copy,
+    iconClasses: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/25',
+  },
+  {
+    cmd: '"Melhorar"',
+    desc: 'Seleciona tudo, envia para IA e cola versão melhorada',
+    Icon: Sparkles,
+    iconClasses: 'text-amber-300 bg-amber-500/10 border-amber-500/25',
+  },
+  {
+    cmd: '"Envie"',
+    desc: 'Pressiona Enter para enviar a mensagem',
+    Icon: SendHorizontal,
+    iconClasses: 'text-orange-300 bg-orange-500/10 border-orange-500/25',
+  },
+  {
+    cmd: '"Nova linha"',
+    desc: 'Insere uma quebra de linha',
+    Icon: CornerDownLeft,
+    iconClasses: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/25',
+  },
+];
 
 export function ConfigTab() {
   const [config, setConfig] = useState<any>(null);
@@ -348,17 +393,11 @@ export function ConfigTab() {
                   <div className="border-t border-border/50 pt-3">
                     <h4 className="text-sm font-medium text-accent mb-3">Comandos Disponíveis</h4>
                     <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { cmd: '"Escreva" / "Digite"', desc: 'Transcreve e digita exatamente o que você disser', icon: '📝' },
-                        { cmd: '"Apague"', desc: 'Apaga todo o texto do campo', icon: '🗑️' },
-                        { cmd: '"Selecionar tudo"', desc: 'Seleciona todo o texto (Ctrl+A)', icon: '📋' },
-                        { cmd: '"Copiar"', desc: 'Copia o texto selecionado (Ctrl+C)', icon: '📄' },
-                        { cmd: '"Melhorar"', desc: 'Seleciona tudo, envia para IA e cola versão melhorada', icon: '✨' },
-                        { cmd: '"Envie"', desc: 'Pressiona Enter para enviar a mensagem', icon: '📤' },
-                        { cmd: '"Nova linha"', desc: 'Insere uma quebra de linha', icon: '↵' },
-                      ].map(({cmd, desc, icon}) => (
-                        <div key={cmd} className="flex items-start gap-2 p-2 rounded-md bg-secondary/20 border border-border/50">
-                          <span className="text-base mt-0.5">{icon}</span>
+                      {AVAILABLE_COMMANDS.map(({ cmd, desc, Icon, iconClasses }) => (
+                        <div key={cmd} className="flex items-start gap-3 p-2.5 rounded-md bg-secondary/20 border border-border/50">
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${iconClasses}`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
                           <div>
                             <p className="text-xs font-mono font-semibold text-accent">{cmd}</p>
                             <p className="text-[10px] text-muted-foreground leading-tight">{desc}</p>

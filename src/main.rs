@@ -19,6 +19,8 @@ use audio::vad::{VoiceActivityDetector, VadState};
 use state::{LumenEvent, LumenState};
 use transcription::pipeline::TranscriptionPipeline;
 
+const OVERLAY_ICON_BYTES: &[u8] = include_bytes!("../assets/lumen_circle.png");
+
 /// Lumen — Ecossistema de Produtividade por Voz para Linux
 #[derive(Parser)]
 #[command(name = "lumen", version, about, long_about = None)]
@@ -59,6 +61,7 @@ async fn main() -> Result<()> {
 
     // Validar configuração
     config.validate().context("Configuração inválida")?;
+    ensure_overlay_icon().context("Falha ao atualizar ícone do overlay")?;
 
     // Processar subcomandos
     match cli.command {
@@ -683,8 +686,8 @@ async fn handle_stop_and_process(
     audio_capture: &Arc<RwLock<audio::capture::AudioCapture>>,
     pipeline: &Option<Arc<TranscriptionPipeline>>,
     overlay: &mut ui::overlay::Overlay,
-    always_listening: bool,
-    wake_word: &str,
+    _always_listening: bool,
+    _wake_word: &str,
 ) {
     *recording = false;
     *state.is_recording.write().await = false;
@@ -715,8 +718,6 @@ async fn handle_stop_and_process(
     if let Some(pipe) = pipeline {
         let pipe = Arc::clone(pipe);
         let overlay_sender = overlay.clone_sender();
-        let always = always_listening;
-        let wake = wake_word.to_string();
 
         tokio::spawn(async move {
             tracing::info!("🧠 Iniciando transcrição em segundo plano...");
@@ -751,4 +752,16 @@ fn print_banner() {
    ╚══════╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝╚═╝  ╚═══╝
     Voice Productivity Ecosystem for Linux
     "#);
+}
+
+fn ensure_overlay_icon() -> Result<()> {
+    let data_dir = config::LumenConfig::data_dir();
+    std::fs::create_dir_all(&data_dir)
+        .with_context(|| format!("Falha ao criar diretório de dados {}", data_dir.display()))?;
+
+    let overlay_icon_path = data_dir.join("lumen_circle.png");
+    std::fs::write(&overlay_icon_path, OVERLAY_ICON_BYTES)
+        .with_context(|| format!("Falha ao escrever ícone do overlay em {}", overlay_icon_path.display()))?;
+
+    Ok(())
 }
